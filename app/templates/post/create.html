@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+
+{% block styles %}
+{{ super() }}
+{{ ckeditor.load() }}
+{{ ckeditor.config(name='content') }}
+<style>
+    .ck-editor__editable {
+        min-height: 300px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-body">
+                    <h3 class="card-title mb-4">发布新帖子</h3>
+                    <form method="POST" enctype="multipart/form-data">
+                        {{ form.csrf_token }}
+                        <div class="mb-3">
+                            {{ form.title.label(class="form-label") }}
+                            {{ form.title(class="form-control") }}
+                            {% if form.title.errors %}
+                            <div class="invalid-feedback d-block">
+                                {% for error in form.title.errors %}
+                                    {{ error }}
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                        </div>
+                        <div class="mb-3">
+                            <label for="category" class="form-label">分类</label>
+                            <select class="form-select" id="category" name="category" required>
+                                <option value="分享">分享</option>
+                                <option value="需求">需求</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            {{ form.content.label(class="form-label") }}
+                            <div class="editor-toolbar">
+                                <button type="button" class="btn btn-sm btn-outline-secondary me-1" onclick="insertImage()">
+                                    <i class="fas fa-image"></i> 插入图片
+                                </button>
+                            </div>
+                            {{ form.content(class="form-control", rows="10") }}
+                            {% if form.content.errors %}
+                            <div class="invalid-feedback d-block">
+                                {% for error in form.content.errors %}
+                                    {{ error }}
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                        </div>
+                        <div class="mb-3">
+                            {{ form.image.label(class="form-label") }}
+                            {{ form.image(class="form-control") }}
+                            <div class="form-text">支持jpg、jpeg、png、gif格式，单个文件不超过5MB</div>
+                            {% if form.image.errors %}
+                            <div class="invalid-feedback d-block">
+                                {% for error in form.image.errors %}
+                                    {{ error }}
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                        </div>
+                        <div class="d-grid">
+                            {{ form.submit(class="btn btn-primary") }}
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+function insertImage() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = function(e) {
+        const file = e.target.files[0];
+        if (file) {
+            const formData = new FormData();
+            formData.append('image', file);
+            
+            // 添加 CSRF token
+            const csrfToken = document.querySelector('input[name="csrf_token"]').value;
+            
+            fetch('/upload_image', {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-CSRFToken': csrfToken
+                }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('上传失败');
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.success) {
+                    const textarea = document.getElementById('content');
+                    const imageMarkdown = `![${file.name}](${data.url})\n`;
+                    const start = textarea.selectionStart;
+                    textarea.value = textarea.value.substring(0, start) + 
+                                   imageMarkdown + 
+                                   textarea.value.substring(textarea.selectionEnd);
+                } else {
+                    alert('上传失败：' + data.message);
+                }
+            })
+            .catch(error => {
+                alert('上传失败：' + error.message);
+            });
+        }
+    };
+    input.click();
+}
+</script>
+{% endblock %} 

@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <div class="row">
+        <!-- 用户信息卡片 -->
+        <div class="col-md-4">
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h4 class="card-title">{{ user.username }}</h4>
+                    <p class="card-text">
+                        <small class="text-muted">{{ user.email }}</small>
+                    </p>
+                    <div class="user-stats">
+                        <div class="row text-center">
+                            <div class="col">
+                                <h5>{{ total_posts }}</h5>
+                                <small class="text-muted">帖子</small>
+                            </div>
+                            <div class="col">
+                                <h5>{{ total_likes }}</h5>
+                                <small class="text-muted">获赞</small>
+                            </div>
+                            <div class="col">
+                                <h5>{{ total_views }}</h5>
+                                <small class="text-muted">浏览</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 用户帖子列表 -->
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-body">
+                    <h4 class="card-title mb-4">我的帖子</h4>
+                    {% if posts %}
+                        {% for post in posts %}
+                        <div class="post-item mb-3">
+                            <h5>
+                                <a href="{{ url_for('main.post_detail', post_id=post._id) }}" class="text-decoration-none">
+                                    {{ post.title }}
+                                </a>
+                            </h5>
+                            <div class="post-meta">
+                                <small class="text-muted">
+                                    <i class="fas fa-calendar me-1"></i>{{ post.created_at.strftime('%Y-%m-%d %H:%M') }}
+                                    <span class="ms-2">
+                                        <i class="fas fa-eye me-1"></i>{{ post.views|default(0) }}
+                                        <i class="fas fa-heart ms-2 me-1"></i>{{ post.likes|default(0) }}
+                                    </span>
+                                </small>
+                            </div>
+                            <div class="post-actions mt-2">
+                                <a href="{{ url_for('main.edit_post', post_id=post._id) }}" class="btn btn-sm btn-outline-primary">
+                                    <i class="fas fa-edit"></i> 编辑
+                                </a>
+                                <a href="{{ url_for('main.delete_post', post_id=post._id) }}" 
+                                   class="btn btn-sm btn-outline-danger"
+                                   onclick="return confirm('确定要删除这篇帖子吗？')">
+                                    <i class="fas fa-trash"></i> 删除
+                                </a>
+                            </div>
+                        </div>
+                        {% if not loop.last %}
+                        <hr>
+                        {% endif %}
+                        {% endfor %}
+                    {% else %}
+                        <p class="text-center text-muted">还没有发布过帖子</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

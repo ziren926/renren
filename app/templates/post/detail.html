@@ -1,0 +1,270 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <!-- 帖子内容卡片 -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <!-- 标题和元数据 -->
+            <div class="border-bottom pb-3 mb-3">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h1 class="post-title mb-0">{{ post.title }}</h1>
+                    {% if current_user.is_authenticated and current_user.get_id()|string == post.author_id|string %}
+                    <div class="post-actions">
+                        <a href="{{ url_for('main.edit_post', post_id=post._id) }}" 
+                           class="btn btn-sm btn-link text-secondary" 
+                           title="编辑帖子">
+                            <i class="fas fa-edit"></i>
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="text-secondary mt-2">
+                    <small>
+                        <span class="me-3"><i class="fas fa-user"></i> {{ post.author_name }}</span>
+                        <span class="me-3"><i class="fas fa-calendar"></i> {{ post.created_at.strftime('%Y-%m-%d %H:%M') }}</span>
+                        <span class="me-3"><i class="fas fa-folder"></i> {{ post.category }}</span>
+                        <span class="me-3"><i class="fas fa-eye"></i> {{ post.views }}</span>
+                        <span><i class="fas fa-heart"></i> {{ post.likes }}</span>
+                    </small>
+                </div>
+            </div>
+            
+            <!-- 修改帖子内容显示部分 -->
+            <div class="post-content">
+                {% set content = post.content %}
+                {% if content %}
+                    {% for line in content.split('\n') %}
+                        {% if 'http://127.0.0.1:5000/image/' in line %}
+                            {% set image_id = line.split('/image/')[-1].split(')')[0] %}
+                            <p>{{ line.split('![')[0] if '![' in line else '' }}</p>
+                            <img src="{{ url_for('main.get_image', file_id=image_id) }}" class="img-fluid my-3" alt="帖子图片">
+                        {% else %}
+                            <p>{{ line }}</p>
+                        {% endif %}
+                    {% endfor %}
+                {% endif %}
+            </div>
+
+            <!-- 操作按钮 -->
+            <div class="mt-4">
+                <button class="btn btn-outline-danger like-btn {% if post.liked_by_user %}liked{% endif %}"
+                        onclick="likePost('{{ post._id }}')">
+                    <i class="fas fa-heart"></i>
+                    <span class="like-count">{{ post.likes }}</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 评论区 -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">评论 ({{ comments|length }})</h5>
+        </div>
+        <div class="card-body">
+            <!-- 评论表单 -->
+            {% if current_user.is_authenticated %}
+            <form method="POST" class="mb-4">
+                {{ form.hidden_tag() }}
+                <div class="mb-3">
+                    {{ form.content(class="form-control", rows="3", placeholder="写下你的评论...") }}
+                </div>
+                <button type="submit" class="btn btn-primary">发表评论</button>
+            </form>
+            {% else %}
+            <div class="alert alert-info">
+                请<a href="{{ url_for('auth.login') }}">登录</a>后发表评论
+            </div>
+            {% endif %}
+
+            <!-- 评论列表 -->
+            {% for comment in comments %}
+            <div class="comment-item p-3 border-bottom" id="comment-{{ comment._id }}">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <strong>{{ comment.username }}</strong>
+                        <small class="text-muted ms-2">{{ comment.created_at.strftime('%Y-%m-%d %H:%M') }}</small>
+                    </div>
+                    {% if current_user.is_authenticated and current_user.get_id()|string == comment.user_id %}
+                    <button class="btn btn-sm btn-link text-danger" onclick="deleteComment('{{ comment._id }}')">
+                        <i class="fas fa-times"></i>
+                    </button>
+                    {% endif %}
+                </div>
+                <div class="mt-2">{{ comment.content }}</div>
+            </div>
+            {% else %}
+            <div class="text-center text-muted py-3">
+                暂无评论
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block styles %}
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<style>
+.post-content {
+    word-wrap: break-word;
+    line-height: 1.6;
+}
+
+.post-content p {
+    margin-bottom: 1rem;
+    white-space: pre-wrap;
+}
+
+.post-content img {
+    max-width: 100%;
+    height: auto;
+    margin: 1rem 0;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    display: block;
+}
+
+.comment-item:hover {
+    background-color: #f8f9fa;
+}
+
+.like-btn.liked {
+    background-color: #dc3545;
+    border-color: #dc3545;
+    color: white;
+}
+
+.like-btn.liked:hover {
+    background-color: #c82333;
+    border-color: #bd2130;
+}
+
+/* 调整容器宽度，减少边距 */
+.container-fluid {
+    max-width: 1200px !important;  /* 增加最大宽度 */
+    padding-left: 8px;  /* 减少左边距 */
+    padding-right: 8px;  /* 减少右边距 */
+    margin: 0 auto;
+}
+
+/* 调整卡片边距 */
+.card-body {
+    padding: 1.25rem;  /* 减少卡片内边距 */
+}
+
+/* 更新标题样式 */
+.post-title {
+    font-size: 1.5rem;  /* 调小字体大小 */
+    font-weight: 600;   /* 稍微加粗 */
+    color: #333;        /* 深灰色 */
+    line-height: 1.4;   /* 调整行高 */
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;  /* 添加中文字体 */
+    margin-bottom: 0.75rem;
+    margin-right: 10px;
+    flex: 1;
+}
+
+@media (max-width: 768px) {
+    .container-fluid {
+        padding-left: 4px;
+        padding-right: 4px;
+    }
+    .post-title {
+        font-size: 1.25rem;  /* 移动端字体更小 */
+    }
+}
+
+/* 编辑按钮样式 */
+.post-actions .btn-link {
+    padding: 4px 8px;
+    font-size: 0.875rem;
+    text-decoration: none;
+}
+
+.post-actions .btn-link:hover {
+    color: #0056b3 !important;
+    background-color: rgba(0, 0, 0, 0.05);
+    border-radius: 4px;
+}
+</style>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const contentElement = document.getElementById('post-content');
+    if (contentElement) {  // 添加检查
+        const content = contentElement.textContent;
+        if (content) {  // 添加检查
+            marked.setOptions({
+                baseUrl: '{{ request.url_root }}'
+            });
+            contentElement.innerHTML = marked.parse(content);
+        }
+    }
+});
+
+function likePost(postId) {
+    fetch(`/post/${postId}/like`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token() }}'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            const likeBtn = document.querySelector('.like-btn');
+            const likeCount = likeBtn.querySelector('.like-count');
+            likeCount.textContent = data.likes;
+            likeBtn.classList.toggle('liked');
+        }
+    });
+}
+
+function deletePost(postId) {
+    if (confirm('确定要删除这篇帖子吗？')) {
+        fetch(`/post/${postId}/delete`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token() }}'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                window.location.href = '{{ url_for("main.index") }}';
+            } else {
+                alert(data.message || '删除失败');
+            }
+        });
+    }
+}
+
+function deleteComment(commentId) {
+    if (confirm('确定要删除这条评论吗？')) {
+        fetch(`/comment/${commentId}/delete`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token() }}'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const commentElement = document.getElementById(`comment-${commentId}`);
+                commentElement.remove();
+            } else {
+                alert(data.message || '删除失败');
+            }
+        });
+    }
+}
+</script>
+{% endblock %} 

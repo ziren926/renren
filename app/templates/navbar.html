@@ -1,0 +1,57 @@
+<nav class="navbar navbar-expand-lg navbar-dark">
+    <div class="container-fluid">
+        <!-- 左侧品牌名 -->
+        <a class="navbar-brand" href="{{ url_for('main.index') }}">人人都是产品经理</a>
+        
+        <!-- 移动端折叠按钮 -->
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
+                aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        
+        <!-- 导航内容 -->
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <!-- 中间的导航链接 -->
+            <ul class="navbar-nav mx-auto">
+                <li class="nav-item">
+                    <a class="nav-link {% if not current_category %}active{% endif %}" href="{{ url_for('main.index') }}">全部</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if current_category == '需求集市' %}active{% endif %}" 
+                       href="{{ url_for('main.index', category='需求集市') }}">需求集市</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if current_category == '经验交流' %}active{% endif %}" 
+                       href="{{ url_for('main.index', category='经验交流') }}">经验交流</a>
+                </li>
+            </ul>
+            
+            <!-- 右侧用户信息 -->
+            <ul class="navbar-nav">
+                {% if current_user.is_authenticated %}
+                <li class="nav-item">
+                    <a class="nav-link" href="{{ url_for('main.create_post') }}">
+                        <i class="fas fa-edit"></i> 发帖
+                    </a>
+                </li>
+                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button"
+                       data-bs-toggle="dropdown" aria-expanded="false">
+                        <i class="fas fa-user"></i> {{ current_user.username }}
+                    </a>
+                    <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdown">
+                        <li><a class="dropdown-item" href="{{ url_for('auth.logout') }}">退出</a></li>
+                    </ul>
+                </li>
+                {% else %}
+                <li class="nav-item">
+                    <a class="nav-link" href="{{ url_for('auth.login') }}">登录</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="{{ url_for('auth.register') }}">注册</a>
+                </li>
+                {% endif %}
+            </ul>
+        </div>
+    </div>
+</nav> 

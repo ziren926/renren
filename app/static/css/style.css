@@ -1,0 +1,600 @@
+:root {
+    --primary-color: #3498db;
+    --primary-light: #ebf5fb;
+    --text-color: #2c3e50;
+    --border-color: #e1e8ed;
+    --bg-light: #f8f9fa;
+}
+
+/* 导航栏样式 */
+.navbar {
+    background-color: white;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    padding: 0.5rem 0;
+    height: 60px;
+}
+
+.navbar-brand {
+    color: var(--primary-color) !important;
+    font-weight: 600;
+}
+
+.brand-text {
+    font-size: 1.2rem;
+}
+
+/* 导航链接样式 */
+.nav-link {
+    color: var(--text-color) !important;
+    padding: 0.5rem 1rem !important;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+.nav-link:hover {
+    color: var(--primary-color) !important;
+}
+
+/* 搜索框样式 */
+.search-input {
+    border-radius: 20px 0 0 20px;
+    border: 1px solid var(--border-color);
+    padding: 0.375rem 1rem;
+}
+
+.search-input:focus {
+    box-shadow: none;
+    border-color: var(--primary-color);
+}
+
+.input-group .btn {
+    border-radius: 0 20px 20px 0;
+    border: 1px solid var(--border-color);
+    border-left: none;
+}
+
+/* 按钮样式 */
+.btn-primary {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+    border-radius: 20px;
+    padding: 0.375rem 1.2rem;
+    font-weight: 500;
+}
+
+.btn-primary:hover {
+    background-color: #2980b9;
+    border-color: #2980b9;
+}
+
+.new-post-btn {
+    margin-right: 1rem;
+}
+
+/* 用户操作区样式 */
+.nav-item-group {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.dropdown-toggle {
+    color: var(--text-color) !important;
+    text-decoration: none;
+    padding: 0.5rem 1rem;
+    font-weight: 500;
+}
+
+.dropdown-menu {
+    border: 1px solid var(--border-color);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    border-radius: 8px;
+}
+
+.dropdown-item {
+    color: var(--text-color);
+    padding: 0.5rem 1rem;
+}
+
+.dropdown-item:hover {
+    background-color: var(--primary-light);
+    color: var(--primary-color);
+}
+
+/* 响应式调整 */
+@media (max-width: 991.98px) {
+    .navbar {
+        height: auto;
+        padding: 0.5rem 1rem;
+    }
+
+    .nav-item-group {
+        margin-top: 1rem;
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .new-post-btn {
+        margin-right: 0;
+        margin-bottom: 0.5rem;
+    }
+}
+
+/* 卡片样式 */
+.card {
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.card-title {
+    color: var(--text-color);
+    font-weight: 600;
+}
+
+/* 警告框样式 */
+.alert {
+    border-radius: 8px;
+    border: none;
+}
+
+.alert-success {
+    background-color: #d4edda;
+    color: #155724;
+}
+
+.alert-error {
+    background-color: #f8d7da;
+    color: #721c24;
+}
+
+.form-control:focus {
+    border-color: #007bff;
+    box-shadow: 0 0 0 0.2rem rgba(0,123,255,.25);
+}
+
+/* 帖子卡片样式 */
+.post-card {
+    transition: transform 0.2s;
+    border: 1px solid var(--border-color);
+}
+
+.post-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.post-title {
+    color: var(--text-color);
+    font-weight: 600;
+}
+
+.post-title:hover {
+    color: var(--primary-color);
+}
+
+.post-content {
+    max-height: 150px;
+    overflow: hidden;
+    position: relative;
+}
+
+.post-content::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 50px;
+    background: linear-gradient(transparent, white);
+}
+
+.post-meta {
+    border-top: 1px solid var(--border-color);
+    padding-top: 1rem;
+}
+
+/* 分类标签样式 */
+.category-tabs {
+    background: white;
+    padding: 1rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.nav-pills .nav-link {
+    color: var(--text-color);
+    border-radius: 20px;
+    padding: 0.5rem 1.2rem;
+    margin-right: 0.5rem;
+}
+
+.nav-pills .nav-link.active {
+    background-color: var(--primary-color);
+}
+
+/* 侧边栏样式 */
+.sidebar-card {
+    margin-bottom: 1.5rem;
+}
+
+.sidebar-card .card-title {
+    font-size: 1.1rem;
+    margin-bottom: 1rem;
+    color: var(--primary-color);
+}
+
+.ad-space {
+    background: var(--primary-light);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.ad-space img {
+    width: 100%;
+    height: auto;
+}
+
+.announcement {
+    font-size: 0.9rem;
+}
+
+/* 响应式调整 */
+@media (max-width: 991.98px) {
+    .col-md-9 {
+        margin-bottom: 2rem;
+    }
+}
+
+/* 帖子互动样式 */
+.post-stats {
+    display: flex;
+    align-items: center;
+    color: var(--text-color);
+    opacity: 0.8;
+}
+
+.post-stats span {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+.post-stats i {
+    font-size: 0.9rem;
+}
+
+.post-stats .fa-heart.text-danger {
+    color: #dc3545 !important;
+}
+
+.view-count, .like-count, .comment-count {
+    font-size: 0.9rem;
+}
+
+.post-info {
+    display: flex;
+    align-items: center;
+}
+
+.btn-like {
+    background: none;
+    border: none;
+    color: #6c757d;
+    padding: 0.25rem 0.5rem;
+    transition: all 0.2s;
+}
+
+.btn-like:hover {
+    color: #dc3545;
+}
+
+.btn-like.liked {
+    color: #dc3545;
+}
+
+.btn-like i {
+    margin-right: 0.3rem;
+}
+
+/* 评论区样式 */
+.comment-item {
+    padding: 1rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.comment-item:last-child {
+    border-bottom: none;
+}
+
+.comment-meta {
+    font-size: 0.9rem;
+}
+
+.comment-content {
+    color: var(--text-color);
+}
+
+/* 帖子详情页样式 */
+.post-content {
+    font-size: 1.1rem;
+    line-height: 1.6;
+}
+
+.post-meta {
+    color: var(--text-color);
+    opacity: 0.8;
+}
+
+/* 分类排行榜样式 */
+.category-ranking {
+    background-color: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.category-ranking .card-title {
+    color: var(--primary-color);
+    font-weight: 600;
+}
+
+.category-stat-item {
+    padding: 0.5rem;
+    border-radius: 6px;
+    transition: all 0.3s ease;
+}
+
+.category-stat-item:hover {
+    background-color: var(--primary-light);
+}
+
+.category-name {
+    font-weight: 500;
+    color: var(--text-color);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.category-count {
+    color: var(--primary-color);
+    font-weight: 500;
+    font-size: 0.9rem;
+}
+
+.ranking-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    font-size: 0.8rem;
+    font-weight: bold;
+    color: white;
+}
+
+.rank-1 {
+    background-color: #FFD700;  /* 金色 */
+}
+
+.rank-2 {
+    background-color: #C0C0C0;  /* 银色 */
+}
+
+.rank-3 {
+    background-color: #CD7F32;  /* 铜色 */
+}
+
+.progress {
+    background-color: #E9ECEF;
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.progress-bar {
+    background-color: var(--primary-color);
+    transition: width 0.6s ease;
+}
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+    .category-stat-item {
+        margin-bottom: 1rem;
+    }
+    
+    .col-md-4 {
+        padding: 0 0.5rem;
+    }
+}
+
+/* 排行榜容器 */
+.row.mb-4 {
+    margin-bottom: 1rem !important;
+}
+
+.ranking-card {
+    background-color: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    width: 100%;
+}
+
+.ranking-card .card-body {
+    padding: 15px;
+}
+
+.ranking-card .card-title {
+    color: var(--text-color);
+    font-weight: 600;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border-color);
+    margin-bottom: 12px;
+    font-size: 0.95rem;
+    display: flex;
+    align-items: center;
+}
+
+.ranking-card .card-title i {
+    margin-right: 6px;
+}
+
+.ranking-card .card-title small {
+    font-size: 0.8rem;
+    opacity: 0.7;
+    margin-left: 6px;
+}
+
+.ranking-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.ranking-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-radius: 6px;
+    background-color: var(--bg-light);
+    transition: all 0.2s ease;
+    height: 36px;
+    position: relative;
+}
+
+.ranking-number {
+    width: 22px;
+    height: 22px;
+    min-width: 22px;
+    background-color: var(--text-color);
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 0.85rem;
+}
+
+.ranking-content {
+    flex: 1;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.category-name {
+    font-weight: 500;
+    color: var(--text-color);
+    font-size: 0.9rem;
+}
+
+.ranking-stats {
+    display: flex;
+    gap: 4px;
+}
+
+.ranking-stats .badge {
+    font-weight: normal;
+    padding: 0.25em 0.5em;
+    font-size: 0.8rem;
+}
+
+.progress {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 2px !important;
+    margin: 0;
+    border-radius: 0;
+    background-color: var(--border-color);
+}
+
+.progress-bar {
+    background-color: var(--primary-color);
+}
+
+/* 特殊排名颜色 */
+.ranking-number.rank-1 { background-color: #FFD700; }
+.ranking-number.rank-2 { background-color: #C0C0C0; }
+.ranking-number.rank-3 { background-color: #CD7F32; }
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+    .col-md-6:first-child {
+        margin-bottom: 1rem;
+    }
+}
+
+/* 排行榜标签页样式 */
+.ranking-tabs .nav-tabs {
+    border-bottom: 1px solid var(--border-color);
+}
+
+.ranking-tabs .nav-link {
+    color: var(--text-color);
+    border: none;
+    padding: 0.5rem 1rem;
+    font-size: 0.9rem;
+    position: relative;
+}
+
+.ranking-tabs .nav-link:hover {
+    color: var(--primary-color);
+    border: none;
+}
+
+.ranking-tabs .nav-link.active {
+    color: var(--primary-color);
+    background: none;
+    border: none;
+}
+
+.ranking-tabs .nav-link.active::after {
+    content: '';
+    position: absolute;
+    bottom: -1px;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background-color: var(--primary-color);
+}
+
+.ranking-tabs .nav-tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+.ranking-tabs .nav-tabs::-webkit-scrollbar {
+    display: none;
+}
+
+/* 调整现有的排行榜样式 */
+.ranking-card {
+    height: 100%;
+    min-height: 400px;
+}
+
+.tab-content {
+    min-height: 300px;
+}
+
+.ranking-list {
+    margin-top: 0.5rem;
+}
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+    .ranking-tabs .nav-link {
+        padding: 0.5rem;
+        font-size: 0.8rem;
+    }
+    
+    .col-md-6:first-child {
+        margin-bottom: 1rem;
+    }
+} 

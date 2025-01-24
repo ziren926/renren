@@ -1,0 +1,50 @@
+.rich-text-editor {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  overflow: hidden;
+  background: white;
+}
+
+.rich-text-editor .tox-tinymce {
+  border: none !important;
+}
+
+.rich-text-editor .tox .tox-toolbar__primary {
+  background: #f8f9fa !important;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.rich-text-editor .tox .tox-edit-area__iframe {
+  background: white !important;
+}
+
+.rich-text-editor .tox .tox-statusbar {
+  border-top: 1px solid #e2e8f0 !important;
+}
+
+/* 编辑器内容样式 */
+.rich-text-editor .mce-content-body {
+  padding: 20px;
+}
+
+.rich-text-editor .mce-content-body img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 1em auto;
+}
+
+.rich-text-editor .mce-content-body p {
+  margin: 1em 0;
+  line-height: 1.6;
+}
+
+.rich-text-editor .mce-content-body h1,
+.rich-text-editor .mce-content-body h2,
+.rich-text-editor .mce-content-body h3,
+.rich-text-editor .mce-content-body h4,
+.rich-text-editor .mce-content-body h5,
+.rich-text-editor .mce-content-body h6 {
+  margin: 1.5em 0 1em;
+  line-height: 1.4;
+} 

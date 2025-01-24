@@ -1,0 +1,110 @@
+/* src/components/Navbar/styles.css */
+.navbar {
+  padding: 0;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+}
+
+.navbar-content {
+  max-width: 1400px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  height: 100%;
+  padding: 0 24px;
+}
+
+.brand {
+  flex: 0 0 200px;
+  display: flex;
+  align-items: center;
+}
+
+.brand-name {
+  font-size: 18px;
+  font-weight: bold;
+  color: #1890ff;
+  white-space: nowrap;
+}
+
+.navbar-center {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  margin: 0 48px;
+}
+
+.nav-menu {
+  border-bottom: none;
+  flex: 0 0 auto;
+}
+
+.search-input {
+  width: 300px;
+}
+
+.navbar-right {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+}
+
+.time-user-info {
+  color: rgba(0, 0, 0, 0.65);
+  font-size: 14px;
+  white-space: nowrap;
+  margin-right: 16px;
+}
+
+/* Hover 效果 */
+.navbar a:hover {
+  color: #1890ff;
+}
+
+/* Active 菜单项样式 */
+.nav-menu .ant-menu-item-selected {
+  color: #1890ff;
+  border-bottom: 2px solid #1890ff;
+}
+
+/* 按钮样式优化 */
+.navbar-right .ant-btn {
+  height: 32px;
+  padding: 4px 15px;
+}
+
+.navbar-right .ant-btn-primary {
+  background-color: #1890ff;
+  border-color: #1890ff;
+}
+
+/* 响应式调整 */
+@media (max-width: 1200px) {
+  .search-input {
+    width: 200px;
+  }
+}
+
+@media (max-width: 768px) {
+  .navbar-center {
+    margin: 0 16px;
+  }
+
+  .search-input {
+    width: 150px;
+  }
+
+  .brand-name {
+    font-size: 16px;
+  }
+
+  .time-user-info {
+    display: none;
+  }
+}

@@ -1,0 +1,84 @@
+// src/components/Header/styles.scss
+.app-header {
+  background: #ffffff;
+  padding: 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  position: fixed;
+  width: 100%;
+  z-index: 1000;
+
+  .header-content {
+    max-width: 1200px;
+    margin: 0 auto;
+    height: 64px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 24px;
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+
+    a {
+      display: flex;
+      align-items: center;
+      color: #000000;
+      text-decoration: none;
+    }
+
+    .logo {
+      height: 32px;
+      margin-right: 12px;
+    }
+
+    .brand-name {
+      font-size: 18px;
+      font-weight: 600;
+    }
+  }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+
+    .search-input {
+      width: 200px;
+      transition: width 0.3s;
+
+      &:focus-within {
+        width: 300px;
+      }
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      color: #666;
+      padding: 0 12px;
+      cursor: pointer;
+      transition: color 0.3s;
+
+      &:hover {
+        color: #1890ff;
+      }
+
+      .anticon {
+        font-size: 20px;
+        margin-right: 4px;
+      }
+    }
+
+    .user-avatar {
+      cursor: pointer;
+      padding: 4px;
+      border-radius: 50%;
+      transition: background-color 0.3s;
+
+      &:hover {
+        background-color: rgba(0, 0, 0, 0.04);
+      }
+    }
+  }
+}

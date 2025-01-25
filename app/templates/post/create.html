@@ -1,73 +1,58 @@
 {% extends "base.html" %}
 
-{% block styles %}
-{{ super() }}
-{{ ckeditor.load() }}
-{{ ckeditor.config(name='content') }}
-<style>
-    .ck-editor__editable {
-        min-height: 300px;
-    }
-</style>
+{% block head %}
+<!-- 引入 wangEditor -->
+<script src="https://unpkg.com/@wangeditor/editor@latest/dist/index.js"></script>
+<script src="https://unpkg.com/@wangeditor/editor@latest/dist/css/style.css"></script>
 {% endblock %}
 
+{% block title %}写文章{% endblock %}
+
 {% block content %}
-<div class="container">
+<div class="container mt-4">
     <div class="row justify-content-center">
         <div class="col-md-8">
-            <div class="card">
+            <div class="card border-0">
                 <div class="card-body">
-                    <h3 class="card-title mb-4">发布新帖子</h3>
-                    <form method="POST" enctype="multipart/form-data">
+                    <h4 class="card-title mb-4">{{ '发布需求' if post_type == 'market' else '发布文章' }}</h4>
+                    <form method="post" enctype="multipart/form-data">
                         {{ form.csrf_token }}
+                        
                         <div class="mb-3">
                             {{ form.title.label(class="form-label") }}
                             {{ form.title(class="form-control") }}
-                            {% if form.title.errors %}
-                            <div class="invalid-feedback d-block">
-                                {% for error in form.title.errors %}
-                                    {{ error }}
-                                {% endfor %}
-                            </div>
-                            {% endif %}
                         </div>
-                        <div class="mb-3">
-                            <label for="category" class="form-label">分类</label>
-                            <select class="form-select" id="category" name="category" required>
-                                <option value="分享">分享</option>
-                                <option value="需求">需求</option>
-                            </select>
-                        </div>
+                        
                         <div class="mb-3">
                             {{ form.content.label(class="form-label") }}
-                            <div class="editor-toolbar">
-                                <button type="button" class="btn btn-sm btn-outline-secondary me-1" onclick="insertImage()">
+                            <div class="content-paste-tip mb-2 small text-muted">
+                                <i class="fas fa-info-circle"></i> 
+                                支持粘贴网络图片，本地图片请点击"插入图片"按钮上传
+                            </div>
+                            <div class="content-toolbar mb-2">
+                                <button type="button" class="btn btn-sm btn-outline-secondary" id="insertImage">
                                     <i class="fas fa-image"></i> 插入图片
                                 </button>
+                                <input type="file" id="imageInput" accept="image/*" style="display: none;">
                             </div>
                             {{ form.content(class="form-control", rows="10") }}
-                            {% if form.content.errors %}
-                            <div class="invalid-feedback d-block">
-                                {% for error in form.content.errors %}
-                                    {{ error }}
-                                {% endfor %}
-                            </div>
-                            {% endif %}
                         </div>
+                        
                         <div class="mb-3">
-                            {{ form.image.label(class="form-label") }}
-                            {{ form.image(class="form-control") }}
-                            <div class="form-text">支持jpg、jpeg、png、gif格式，单个文件不超过5MB</div>
-                            {% if form.image.errors %}
-                            <div class="invalid-feedback d-block">
-                                {% for error in form.image.errors %}
-                                    {{ error }}
-                                {% endfor %}
-                            </div>
-                            {% endif %}
+                            {{ form.post_type.label(class="form-label") }}
+                            {{ form.post_type(class="form-select") }}
                         </div>
-                        <div class="d-grid">
-                            {{ form.submit(class="btn btn-primary") }}
+                        
+                        <div class="mb-3">
+                            {{ form.preview_image.label(class="form-label") }}
+                            {{ form.preview_image(class="form-control") }}
+                        </div>
+                        
+                        <div class="text-end">
+                            <button type="submit" class="btn" 
+                                    style="background-color: #ea6f5a; color: white; border-radius: 20px; padding: 8px 25px;">
+                                发布
+                            </button>
                         </div>
                     </form>
                 </div>
@@ -75,55 +60,323 @@
         </div>
     </div>
 </div>
-{% endblock %}
 
-{% block scripts %}
-{{ super() }}
+<style>
+.image-upload-area {
+    width: 200px;
+    height: 150px;
+    border: 2px dashed #ddd;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+.image-upload-area:hover {
+    border-color: #aaa;
+}
+
+.upload-placeholder {
+    text-align: center;
+    color: #666;
+}
+
+.upload-placeholder i {
+    font-size: 24px;
+    color: #999;
+}
+
+.preview-image {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.image-upload-area.dragover {
+    border-color: #007bff;
+    background-color: rgba(0, 123, 255, 0.05);
+}
+
+/* 编辑器样式 */
+#editor-container {
+    border: 1px solid #ccc;
+    border-top: none;
+}
+
+.content-toolbar {
+    padding: 5px;
+    border: 1px solid #ced4da;
+    border-bottom: none;
+    border-radius: 4px 4px 0 0;
+    background-color: #f8f9fa;
+}
+
+#content {
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
+}
+
+/* 添加图片预览和缩放相关样式 */
+#content {
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
+}
+
+/* 预览区域样式 */
+.content-preview {
+    border: 1px solid #ced4da;
+    border-radius: 0 0 4px 4px;
+    padding: 15px;
+    margin-top: -1px;
+    background: #fff;
+    min-height: 300px;
+}
+
+.content-preview img {
+    max-width: 100%;
+    max-height: 200px;  /* 设置最大高度 */
+    height: auto;
+    width: auto;  /* 让宽度自适应 */
+    display: block;  /* 块级显示更整洁 */
+    margin: 10px 0;  /* 添加上下间距 */
+    cursor: se-resize;  /* 显示调整大小的光标 */
+    border: 1px solid transparent;
+}
+
+.content-preview img:hover {
+    border-color: #80bdff;
+}
+
+.content-preview img.resizing {
+    border-color: #007bff;
+    box-shadow: 0 0 0 0.2rem rgba(0,123,255,.25);
+}
+
+/* 切换按钮样式 */
+.view-toggle {
+    margin-left: 10px;
+    color: #6c757d;
+    cursor: pointer;
+}
+
+.view-toggle:hover {
+    color: #495057;
+}
+
+/* 编辑区域的图片预览样式 */
+#content img {
+    max-height: 200px;
+    width: auto;
+}
+</style>
+
 <script>
-function insertImage() {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'image/*';
-    input.onchange = function(e) {
-        const file = e.target.files[0];
-        if (file) {
-            const formData = new FormData();
-            formData.append('image', file);
-            
-            // 添加 CSRF token
-            const csrfToken = document.querySelector('input[name="csrf_token"]').value;
-            
-            fetch('/upload_image', {
-                method: 'POST',
-                body: formData,
-                headers: {
-                    'X-CSRFToken': csrfToken
+document.addEventListener('DOMContentLoaded', function() {
+    const content = document.getElementById('content');
+    const imageInput = document.getElementById('imageInput');
+    const insertImageBtn = document.getElementById('insertImage');
+
+    // 创建预览区域
+    const previewDiv = document.createElement('div');
+    previewDiv.className = 'content-preview d-none';
+    content.parentNode.insertBefore(previewDiv, content.nextSibling);
+
+    // 添加预览切换按钮
+    const toolbarDiv = document.querySelector('.content-toolbar');
+    const toggleBtn = document.createElement('button');
+    toggleBtn.type = 'button';
+    toggleBtn.className = 'btn btn-sm btn-outline-secondary ms-2';
+    toggleBtn.innerHTML = '<i class="fas fa-eye"></i> 预览';
+    toolbarDiv.appendChild(toggleBtn);
+
+    // 切换预览/编辑模式
+    let isPreviewMode = false;
+    toggleBtn.addEventListener('click', function() {
+        isPreviewMode = !isPreviewMode;
+        if (isPreviewMode) {
+            content.classList.add('d-none');
+            previewDiv.classList.remove('d-none');
+            toggleBtn.innerHTML = '<i class="fas fa-edit"></i> 编辑';
+            updatePreview();
+        } else {
+            content.classList.remove('d-none');
+            previewDiv.classList.add('d-none');
+            toggleBtn.innerHTML = '<i class="fas fa-eye"></i> 预览';
+        }
+    });
+
+    // 处理图片尺寸的函数
+    async function processImage(url) {
+        return new Promise((resolve) => {
+            const img = new Image();
+            img.onload = function() {
+                let width = this.width;
+                let height = this.height;
+                
+                // 如果高度超过200px，等比例缩放
+                if (height > 200) {
+                    const ratio = 200 / height;
+                    width = Math.round(width * ratio);
+                    height = 200;
                 }
-            })
-            .then(response => {
+                
+                resolve({ width, height });
+            };
+            img.src = url;
+        });
+    }
+
+    // 修改网络图片粘贴处理
+    content.addEventListener('paste', async function(e) {
+        const clipboardData = e.clipboardData;
+        const text = clipboardData.getData('text');
+        
+        if (text && (text.startsWith('http://') || text.startsWith('https://')) &&
+            (text.endsWith('.png') || text.endsWith('.jpg') || text.endsWith('.jpeg') || text.endsWith('.gif'))) {
+            e.preventDefault();
+            
+            // 获取图片尺寸并处理
+            const dimensions = await processImage(text);
+            
+            const cursorPos = this.selectionStart;
+            const textBefore = this.value.substring(0, cursorPos);
+            const textAfter = this.value.substring(cursorPos);
+            this.value = textBefore + `![图片](${text}){${dimensions.width}x${dimensions.height}}\n` + textAfter;
+        }
+    });
+
+    // 修改本地图片上传处理
+    imageInput.addEventListener('change', async function() {
+        if (this.files && this.files[0]) {
+            const formData = new FormData();
+            formData.append('image', this.files[0]);
+
+            try {
+                const response = await fetch('/upload_content_image', {
+                    method: 'POST',
+                    body: formData
+                });
+
                 if (!response.ok) {
                     throw new Error('上传失败');
                 }
-                return response.json();
-            })
-            .then(data => {
-                if (data.success) {
-                    const textarea = document.getElementById('content');
-                    const imageMarkdown = `![${file.name}](${data.url})\n`;
-                    const start = textarea.selectionStart;
-                    textarea.value = textarea.value.substring(0, start) + 
-                                   imageMarkdown + 
-                                   textarea.value.substring(textarea.selectionEnd);
-                } else {
-                    alert('上传失败：' + data.message);
-                }
-            })
-            .catch(error => {
-                alert('上传失败：' + error.message);
-            });
+
+                const data = await response.json();
+                
+                // 获取图片尺寸并处理
+                const dimensions = await processImage(data.url);
+                
+                const cursorPos = content.selectionStart;
+                const textBefore = content.value.substring(0, cursorPos);
+                const textAfter = content.value.substring(cursorPos);
+                content.value = textBefore + `![图片](${data.url}){${dimensions.width}x${dimensions.height}}\n` + textAfter;
+
+                this.value = '';
+                
+            } catch (error) {
+                console.error('上传图片失败:', error);
+                alert('图片上传失败，请重试');
+            }
         }
-    };
-    input.click();
-}
+    });
+
+    // 更新预览内容的函数
+    function updatePreview() {
+        const markdown = content.value;
+        // 将Markdown图片语法转换为HTML，保持最大高度限制
+        const html = markdown.replace(/!\[([^\]]*)\]\(([^)]+)\)(\{(\d+)x(\d+)\})?/g, (match, alt, src) => {
+            return `<img src="${src}" alt="${alt}">`;
+        });
+        previewDiv.innerHTML = html;
+    }
+
+    // 保持现有的封面上传相关代码
+    const pasteArea = document.getElementById('pasteArea');
+    const previewImage = document.getElementById('previewImage');
+    const imagePreview = document.getElementById('imagePreview');
+    const uploadPlaceholder = document.getElementById('uploadPlaceholder');
+    const removeImage = document.getElementById('removeImage');
+
+    // 处理图片显示
+    function handleImageDisplay(file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            imagePreview.src = e.target.result;
+            imagePreview.classList.remove('d-none');
+            uploadPlaceholder.classList.add('d-none');
+            removeImage.classList.remove('d-none');
+        };
+        reader.readAsDataURL(file);
+    }
+
+    // 处理文件选择
+    previewImage.addEventListener('change', function(e) {
+        if (this.files && this.files[0]) {
+            handleImageDisplay(this.files[0]);
+        }
+    });
+
+    // 点击上传区域触发文件选择
+    pasteArea.addEventListener('click', function() {
+        previewImage.click();
+    });
+
+    // 处理拖放
+    pasteArea.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        this.classList.add('dragover');
+    });
+
+    pasteArea.addEventListener('dragleave', function(e) {
+        e.preventDefault();
+        this.classList.remove('dragover');
+    });
+
+    pasteArea.addEventListener('drop', function(e) {
+        e.preventDefault();
+        this.classList.remove('dragover');
+        if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+            handleImageDisplay(e.dataTransfer.files[0]);
+            
+            // 创建新的 FileList
+            const dataTransfer = new DataTransfer();
+            dataTransfer.items.add(e.dataTransfer.files[0]);
+            previewImage.files = dataTransfer.files;
+        }
+    });
+
+    // 处理粘贴
+    document.addEventListener('paste', function(e) {
+        const items = e.clipboardData.items;
+        for (let i = 0; i < items.length; i++) {
+            if (items[i].type.indexOf('image') !== -1) {
+                const file = items[i].getAsFile();
+                handleImageDisplay(file);
+                
+                // 创建新的 FileList
+                const dataTransfer = new DataTransfer();
+                dataTransfer.items.add(file);
+                previewImage.files = dataTransfer.files;
+                
+                break;
+            }
+        }
+    });
+
+    // 移除图片
+    removeImage.addEventListener('click', function() {
+        previewImage.value = '';
+        imagePreview.classList.add('d-none');
+        uploadPlaceholder.classList.remove('d-none');
+        this.classList.add('d-none');
+    });
+});
 </script>
 {% endblock %} 

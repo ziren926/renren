@@ -1,7 +1,6 @@
 from flask import Blueprint, render_template, redirect, url_for, flash, request, current_app, jsonify, send_file
 from flask_login import current_user, login_required
-from app.models.post import Post
-from app import db, fs, mongo
+from .. import mongo
 from bson import ObjectId
 import math
 from flask_ckeditor import upload_success, upload_fail
@@ -15,110 +14,65 @@ import io
 import mimetypes
 import traceback
 import re
+from app import ckeditor  # 添加 ckeditor 导入
+from gridfs import GridFS
+from PIL import Image
+from app.utils import save_image  # 添加这行导入
+from io import BytesIO
+from pymongo import TEXT, ASCENDING
 
 bp = Blueprint('main', __name__, url_prefix='')
 
 @bp.route('/')
-@bp.route('/index')
 def index():
     try:
-        # 获取分页参数
         page = request.args.get('page', 1, type=int)
         per_page = 10
-        category = request.args.get('category')
+        skip = (page - 1) * per_page
         
-        # 构建查询条件
-        query = {}
-        if category:
-            query['category'] = category
-            
-        # 获取总数
-        total = db.posts.count_documents(query)
+        # 只获取普通帖子
+        total = mongo.db.posts.count_documents({'post_type': 'normal'})
         
-        # 获取分页数据
-        posts = list(db.posts.find(query)
-                    .sort('created_at', -1)
-                    .skip((page - 1) * per_page)
-                    .limit(per_page))
-                    
-        # 处理每个帖子的数据
+        # 获取分页的普通帖子
+        posts = list(mongo.db.posts.find(
+            {'post_type': 'normal'}
+        ).sort('created_at', -1).skip(skip).limit(per_page))
+        
+        # 处理每个帖子的预览图片URL
         for post in posts:
-            # 获取作者信息
-            author = db.users.find_one({'_id': post['author_id']})
-            post['author_name'] = author['username'] if author else '未知用户'
-            
-            # 处理时间格式
-            if isinstance(post.get('created_at'), str):
-                post['created_at'] = datetime.fromisoformat(post['created_at'].replace('Z', '+00:00'))
-            
-            # 从内容中提取第一张图片的ID
-            if 'content' in post:
-                content = post['content']
-                # 打印内容以便调试
-                current_app.logger.info(f"Post content: {content}")
-                
-                # 尝试多种可能的图片格式
-                image_id = None
-                
-                # 1. 尝试完整的Markdown格式
-                markdown_match = re.search(r'!\[.*?\]\(/image/([a-f0-9]{24})\)', content)
-                if markdown_match:
-                    image_id = markdown_match.group(1)
-                
-                # 2. 尝试直接的URL格式
-                if not image_id:
-                    url_match = re.search(r'/image/([a-f0-9]{24})', content)
-                    if url_match:
-                        image_id = url_match.group(1)
-                
-                if image_id:
-                    post['preview_image_id'] = image_id
-                    current_app.logger.info(f"Found image ID in post {post['_id']}: {image_id}")
-                else:
-                    current_app.logger.info(f"No image found in post {post['_id']}")
-            
-            # 转换 ObjectId 为字符串
-            post['_id'] = str(post['_id'])
-            post['author_id'] = str(post['author_id'])
+            if post.get('preview_image'):
+                post['preview_image_url'] = url_for('main.get_image', file_id=post['preview_image'])
         
-        # 在返回之前打印一下处理后的帖子数据
-        for post in posts[:3]:
-            current_app.logger.info(f"Post {post['_id']} preview image: {post.get('preview_image_id')}")
+        # 获取热门文章（只包含普通帖子）
+        hot_posts = list(mongo.db.posts.find(
+            {'post_type': 'normal'}
+        ).sort('views', -1).limit(5))
         
-        # 计算分页信息
-        total_pages = (total + per_page - 1) // per_page
-        pagination = {
-            'page': page,
-            'total': total,
-            'per_page': per_page,
-            'total_pages': total_pages,
-            'has_prev': page > 1,
-            'has_next': page < total_pages,
-            'pages': range(max(1, page - 2), min(total_pages + 1, page + 3))
-        }
+        # 获取最近发表（只包含普通帖子）
+        recent_posts = list(mongo.db.posts.find(
+            {'post_type': 'normal'}
+        ).sort('created_at', -1).limit(5))
         
-        # 获取热门排行
-        hot_ranking = list(db.posts.find().sort('views', -1).limit(5))
-        for post in hot_ranking:
-            post['_id'] = str(post['_id'])
-            
-        # 获取最新动态
-        trending_ranking = list(db.posts.find().sort('created_at', -1).limit(5))
-        for post in trending_ranking:
-            post['_id'] = str(post['_id'])
-            if isinstance(post.get('created_at'), str):
-                post['created_at'] = datetime.fromisoformat(post['created_at'].replace('Z', '+00:00'))
+        # 计算总页数
+        total_pages = (total + per_page - 1) // per_page if total > 0 else 0
         
-        return render_template('index.html',
+        return render_template('index.html', 
                              posts=posts,
-                             hot_ranking=hot_ranking,
-                             trending_ranking=trending_ranking,
-                             pagination=pagination,
-                             current_category=category)
+                             hot_posts=hot_posts,
+                             recent_posts=recent_posts,
+                             page=page,
+                             total_pages=total_pages,
+                             total=total)
                              
     except Exception as e:
-        current_app.logger.error(f"Index error: {str(e)}")
-        return render_template('index.html', posts=[], hot_ranking=[], trending_ranking=[], pagination={})
+        current_app.logger.error(f"Error in index route: {str(e)}")
+        return render_template('index.html', 
+                             posts=[],
+                             hot_posts=[],
+                             recent_posts=[],
+                             page=1,
+                             total_pages=0,
+                             total=0)
 
 @bp.route('/post/new', methods=['GET', 'POST'])
 @login_required
@@ -150,117 +104,186 @@ def new_post():
         
     return render_template('post/new.html')
 
-@bp.route('/post/<post_id>/edit', methods=['GET', 'POST'])
+@bp.route('/edit/<post_id>', methods=['GET', 'POST'])
 @login_required
 def edit_post(post_id):
     try:
-        # 获取帖子
-        post = db.posts.find_one({'_id': ObjectId(post_id)})
+        post = mongo.db.posts.find_one({'_id': ObjectId(post_id)})
         if not post:
             flash('帖子不存在', 'danger')
             return redirect(url_for('main.index'))
             
-        # 检查权限
-        if str(post['author_id']) != current_user.get_id():
-            flash('你没有权限编辑这篇帖子', 'danger')
-            return redirect(url_for('main.post_detail', post_id=post_id))
+        # 检查是否是作者
+        if str(post.get('author_id')) != current_user.get_id():
+            flash('你没有权限编辑这篇文章', 'danger')
+            return redirect(url_for('main.index'))
             
         form = PostForm()
         
-        if request.method == 'GET':
-            # 填充表单
-            form.title.data = post['title']
-            form.content.data = post['content']
-            form.category.data = post.get('category', '经验交流')
-            
         if form.validate_on_submit():
+            title = form.title.data
+            content = form.content.data
+            
+            # 处理预览图片
+            preview_image_id = post.get('preview_image')  # 保持原有图片ID
+            if 'preview_image' in request.files:
+                file = request.files['preview_image']
+                if file and file.filename:
+                    if allowed_file(file.filename):
+                        new_image_id = save_image(file)
+                        if new_image_id:
+                            preview_image_id = new_image_id
+            
             # 更新帖子
             update_data = {
-                'title': form.title.data,
-                'content': form.content.data,
-                'category': form.category.data,
+                'title': title,
+                'content': content,
                 'updated_at': datetime.utcnow()
             }
             
-            # 处理图片上传
-            if form.images.data:
-                image_urls = []
-                for image in form.images.data:
-                    if image.filename:
-                        # 保存到 GridFS
-                        file_id = mongo.save_file(image.filename, image)
-                        image_url = f"![{image.filename}](http://127.0.0.1:5000/image/{file_id})"
-                        image_urls.append(image_url)
-                
-                # 将新图片 URL 添加到内容末尾
-                if image_urls:
-                    update_data['content'] = update_data['content'] + '\n' + '\n'.join(image_urls)
+            if preview_image_id:
+                update_data['preview_image'] = preview_image_id
             
-            db.posts.update_one(
+            mongo.db.posts.update_one(
                 {'_id': ObjectId(post_id)},
                 {'$set': update_data}
             )
             
-            flash('帖子更新成功！', 'success')
-            return redirect(url_for('main.post_detail', post_id=post_id))
+            flash('更新成功！', 'success')
+            # 根据帖子类型返回相应页面
+            if post.get('post_type') == 'market':
+                return redirect(url_for('main.market'))
+            return redirect(url_for('main.index'))
             
-        return render_template('post/edit.html', form=form, post=post)
-        
+        elif request.method == 'GET':
+            form.title.data = post.get('title')
+            form.content.data = post.get('content')
+            
+        return render_template('post/edit.html', 
+                             form=form, 
+                             post=post,
+                             title='编辑文章')
+                             
     except Exception as e:
-        current_app.logger.error(f"Edit post error: {str(e)}")
-        flash('编辑帖子失败', 'danger')
-        return redirect(url_for('main.post_detail', post_id=post_id))
+        current_app.logger.error(f"Error editing post: {str(e)}")
+        flash('编辑失败，请重试', 'danger')
+        return redirect(url_for('main.index'))
 
-@bp.route('/post/<post_id>/delete')
+@bp.route('/post/<post_id>/delete', methods=['POST'])
 @login_required
 def delete_post(post_id):
-    post = Post.get_by_id(post_id)
-    if not post or str(post.author_id) != current_user.get_id():
-        flash('你没有权限删除这个帖子')
-        return redirect(url_for('main.index'))
+    try:
+        current_app.logger.info(f"Delete request received for post: {post_id}")
+        current_app.logger.info(f"Current user: {current_user.get_id()}")
         
-    db.posts.delete_one({'_id': ObjectId(post_id)})
-    flash('帖子已删除')
-    return redirect(url_for('main.index'))
+        # 验证 post_id 格式
+        if not ObjectId.is_valid(post_id):
+            current_app.logger.error(f"Invalid post_id format: {post_id}")
+            return jsonify({'success': False, 'message': '无效的帖子ID'}), 400
+            
+        # 获取帖子
+        post = mongo.db.posts.find_one({'_id': ObjectId(post_id)})
+        if not post:
+            current_app.logger.warning(f"Post not found: {post_id}")
+            return jsonify({'success': False, 'message': '帖子不存在'}), 404
+        
+        # 验证用户权限
+        post_author_id = str(post.get('author_id'))
+        current_user_id = current_user.get_id()
+        current_app.logger.info(f"Post author ID: {post_author_id}")
+        current_app.logger.info(f"Current user ID: {current_user_id}")
+        
+        if post_author_id != current_user_id:
+            current_app.logger.warning("Permission denied - user IDs don't match")
+            return jsonify({'success': False, 'message': '没有权限删除此帖子'}), 403
+        
+        # 删除相关图片
+        if post.get('preview_image'):
+            try:
+                mongo.db.images.delete_one({'_id': ObjectId(post['preview_image'])})
+                current_app.logger.info(f"Deleted associated image: {post['preview_image']}")
+            except Exception as e:
+                current_app.logger.error(f"Error deleting image: {str(e)}")
+        
+        # 删除帖子
+        result = mongo.db.posts.delete_one({'_id': ObjectId(post_id)})
+        
+        if result.deleted_count:
+            current_app.logger.info(f"Successfully deleted post: {post_id}")
+            return jsonify({'success': True, 'message': '帖子已成功删除'})
+        else:
+            current_app.logger.error(f"Failed to delete post: {post_id}")
+            return jsonify({'success': False, 'message': '删除失败，请重试'}), 500
+            
+    except Exception as e:
+        current_app.logger.error(f"Error deleting post {post_id}: {str(e)}\n{traceback.format_exc()}")
+        return jsonify({'success': False, 'message': f'删除时出现错误: {str(e)}'}), 500
+
+def ensure_text_index():
+    """确保文本索引存在"""
+    try:
+        # 获取现有索引
+        existing_indexes = mongo.db.posts.list_indexes()
+        has_text_index = False
+        
+        # 检查是否已存在文本索引
+        for index in existing_indexes:
+            if 'text' in index['name']:
+                has_text_index = True
+                break
+        
+        # 如果不存在文本索引，创建它
+        if not has_text_index:
+            mongo.db.posts.create_index(
+                [('title', 'text'), ('content', 'text')],
+                weights={'title': 10, 'content': 5},
+                default_language='chinese'
+            )
+            current_app.logger.info("Text index created successfully")
+    except Exception as e:
+        current_app.logger.error(f"Error managing text index: {str(e)}")
 
 @bp.route('/search')
 def search():
     query = request.args.get('q', '')
+    search_type = request.args.get('type', 'normal')  # 默认搜索普通帖子
+    
     if not query:
+        if search_type == 'market':
+            return redirect(url_for('main.market'))
         return redirect(url_for('main.index'))
     
-    page = request.args.get('page', 1, type=int)
-    per_page = 10
-    
-    # 使用文本索引搜索
-    search_results = db.posts.find({
-        '$text': {'$search': query}
-    }).sort('created_at', -1).skip((page-1)*per_page).limit(per_page)
-    
-    total_results = db.posts.count_documents({
-        '$text': {'$search': query}
-    })
-    
-    posts = []
-    for post_data in search_results:
-        post = Post.from_db(post_data)
-        author = db.users.find_one({'_id': post.author_id})
-        post.author_name = author['username'] if author else '未知用户'
-        posts.append(post)
-    
-    pagination = {
-        'page': page,
-        'total_pages': math.ceil(total_results / per_page),
-        'has_prev': page > 1,
-        'has_next': page < math.ceil(total_results / per_page),
-        'pages': range(max(1, page - 2), min(math.ceil(total_results / per_page) + 1, page + 3))
-    }
-    
-    return render_template('search.html', 
-                         posts=posts, 
-                         query=query, 
-                         pagination=pagination,
-                         total_results=total_results)
+    try:
+        # 构建模糊匹配的正则表达式
+        pattern = re.compile(f'.*{re.escape(query)}.*', re.IGNORECASE)
+        
+        # 使用 $or 进行标题和内容的模糊匹配，同时限制帖子类型
+        results = list(mongo.db.posts.find({
+            '$and': [
+                {'post_type': search_type},
+                {'$or': [
+                    {'title': {'$regex': pattern}},
+                    {'content': {'$regex': pattern}}
+                ]}
+            ]
+        }).sort('created_at', -1))
+        
+        # 处理搜索结果的预览图
+        for post in results:
+            if post.get('preview_image'):
+                post['preview_image_url'] = url_for('main.get_image', file_id=post['preview_image'])
+        
+        return render_template('search_results.html', 
+                             posts=results, 
+                             query=query,
+                             search_type=search_type)
+                             
+    except Exception as e:
+        current_app.logger.error(f"Search error: {str(e)}")
+        flash('搜索出错，请重试', 'danger')
+        if search_type == 'market':
+            return redirect(url_for('main.market'))
+        return redirect(url_for('main.index'))
 
 @bp.route('/upload', methods=['POST'])
 @login_required
@@ -286,149 +309,103 @@ def allowed_file(filename):
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in {'png', 'jpg', 'jpeg', 'gif'}
 
-@bp.route('/post/<post_id>', methods=['GET', 'POST'])
+@bp.route('/post/<post_id>')
 def post_detail(post_id):
     try:
-        current_app.logger.info(f"Accessing post_detail with ID: {post_id}")
-        
-        # 获取帖子数据
-        post_data = db.posts.find_one({'_id': ObjectId(post_id)})
-        if not post_data:
-            flash('帖子不存在', 'danger')
+        # 验证 post_id 格式
+        if not ObjectId.is_valid(post_id):
+            flash('无效的帖子ID', 'danger')
             return redirect(url_for('main.index'))
-        
-        # 增加浏览量
-        db.posts.update_one(
+            
+        # 获取帖子并增加浏览量
+        post = mongo.db.posts.find_one_and_update(
             {'_id': ObjectId(post_id)},
-            {'$inc': {'views': 1}}
+            {'$inc': {'views': 1}},
+            return_document=True
         )
         
+        if not post:
+            flash('帖子不存在', 'danger')
+            return redirect(url_for('main.index'))
+            
         # 获取作者信息
-        author = db.users.find_one({'_id': post_data['author_id']})
-        post_data['author_name'] = author['username'] if author else '未知用户'
+        author = mongo.db.users.find_one({'_id': post['author_id']})
         
-        # 处理时间格式
-        if isinstance(post_data.get('created_at'), str):
-            post_data['created_at'] = datetime.fromisoformat(post_data['created_at'].replace('Z', '+00:00'))
-        elif not isinstance(post_data.get('created_at'), datetime):
-            post_data['created_at'] = datetime.utcnow()
+        # 确定返回按钮的目标页面
+        back_url = url_for('main.market') if post.get('post_type') == 'market' else url_for('main.index')
         
-        # 获取评论
-        comments = list(db.comments.find({'post_id': ObjectId(post_id)}).sort('created_at', -1))
-        for comment in comments:
-            comment_user = db.users.find_one({'_id': comment['user_id']})
-            comment['username'] = comment_user['username'] if comment_user else '未知用户'
-            if isinstance(comment.get('created_at'), str):
-                comment['created_at'] = datetime.fromisoformat(comment['created_at'].replace('Z', '+00:00'))
-            elif not isinstance(comment.get('created_at'), datetime):
-                comment['created_at'] = datetime.utcnow()
-            comment['_id'] = str(comment['_id'])
-            comment['user_id'] = str(comment['user_id'])
+        # 处理预览图片URL
+        if post.get('preview_image'):
+            post['preview_image_url'] = url_for('main.get_image', file_id=post['preview_image'])
         
-        # 处理评论表单
+        # 创建评论表单
         form = CommentForm()
-        if form.validate_on_submit():
-            if not current_user.is_authenticated:
-                flash('请先登录后再评论', 'warning')
-                return redirect(url_for('auth.login'))
-            
-            comment_data = {
-                'post_id': ObjectId(post_id),
-                'user_id': ObjectId(current_user.get_id()),
-                'content': form.content.data,
-                'created_at': datetime.utcnow()
-            }
-            db.comments.insert_one(comment_data)
-            
-            # 更新帖子的评论计数
-            db.posts.update_one(
-                {'_id': ObjectId(post_id)},
-                {'$inc': {'comment_count': 1}}
-            )
-            
-            flash('评论发表成功！', 'success')
-            return redirect(url_for('main.post_detail', post_id=post_id))
         
-        # 确保所有必要的字段都存在
-        post_data.setdefault('views', 0)
-        post_data.setdefault('likes', 0)
-        post_data.setdefault('comment_count', len(comments))
-        
-        # 转换 ObjectId 为字符串
-        post_data['_id'] = str(post_data['_id'])
-        post_data['author_id'] = str(post_data['author_id'])
-        
-        # 检查当前用户是否已点赞
-        if current_user.is_authenticated:
-            post_data['liked_by_user'] = db.likes.find_one({
-                'post_id': ObjectId(post_id),
-                'user_id': ObjectId(current_user.get_id())
-            }) is not None
-        else:
-            post_data['liked_by_user'] = False
-        
-        return render_template('post/detail.html',
-                             post=post_data,
-                             comments=comments,
-                             form=form)
+        return render_template('post/detail.html', 
+                             post=post,
+                             author=author,
+                             back_url=back_url,
+                             form=form)  # 添加表单到模板上下文
                              
     except Exception as e:
-        current_app.logger.error(f"Post detail error: {str(e)}")
+        current_app.logger.error(f"Error viewing post: {str(e)}\n{traceback.format_exc()}")
         flash('获取帖子失败', 'danger')
         return redirect(url_for('main.index'))
 
 @bp.route('/post/<post_id>/like', methods=['POST'])
 @login_required
 def like_post(post_id):
-    post = Post.get_by_id(post_id)
-    if not post:
-        return jsonify({'success': False, 'error': '帖子不存在'})
+    try:
+        # 更新帖子的点赞数
+        result = mongo.db.posts.update_one(
+            {'_id': ObjectId(post_id)},
+            {'$inc': {'likes': 1}}
+        )
+        
+        if result.modified_count > 0:
+            # 获取更新后的点赞数
+            post = mongo.db.posts.find_one({'_id': ObjectId(post_id)})
+            return jsonify({
+                'success': True,
+                'likes': post.get('likes', 0)
+            })
+    except Exception as e:
+        current_app.logger.error(f"Error liking post: {str(e)}")
     
-    like = db.likes.find_one({
-        'post_id': ObjectId(post_id),
-        'user_id': ObjectId(current_user.get_id())
+    return jsonify({
+        'success': False,
+        'message': '点赞失败'
     })
-    
-    if like:
-        # 取消点赞
-        db.likes.delete_one({'_id': like['_id']})
-        db.posts.update_one({'_id': ObjectId(post_id)}, {'$inc': {'likes': -1}})
-        new_likes = post.likes - 1
-    else:
-        # 添加点赞
-        db.likes.insert_one({
-            'post_id': ObjectId(post_id),
-            'user_id': ObjectId(current_user.get_id()),
-            'created_at': datetime.utcnow()
-        })
-        db.posts.update_one({'_id': ObjectId(post_id)}, {'$inc': {'likes': 1}})
-        new_likes = post.likes + 1
-    
-    return jsonify({'success': True, 'likes': new_likes})
 
 @bp.route('/post/<post_id>/comment', methods=['POST'])
 @login_required
 def add_comment(post_id):
-    content = request.form.get('content')
-    if not content:
-        flash('评论内容不能为空', 'error')
-        return redirect(url_for('main.post_detail', post_id=post_id))
-    
-    comment = Comment(
-        content=content,
-        post_id=ObjectId(post_id),
-        author_id=ObjectId(current_user.get_id())
-    )
-    comment.save()
-    
-    flash('评论发表成功', 'success')
+    form = CommentForm()
+    if form.validate_on_submit():
+        try:
+            # 直接创建评论文档
+            comment_dict = {
+                'post_id': ObjectId(post_id),
+                'author_id': ObjectId(current_user.get_id()),
+                'content': form.content.data,
+                'created_at': datetime.utcnow()
+            }
+            
+            # 保存到数据库
+            mongo.db.comments.insert_one(comment_dict)
+            
+            flash('评论发布成功！', 'success')
+        except Exception as e:
+            current_app.logger.error(f"Error adding comment: {str(e)}")
+            flash('评论发布失败', 'danger')
+            
     return redirect(url_for('main.post_detail', post_id=post_id))
 
 @bp.route('/comment/<comment_id>/delete', methods=['POST'])
 @login_required
 def comment_delete(comment_id):
     try:
-        comment = db.comments.find_one({'_id': ObjectId(comment_id)})
+        comment = mongo.db.comments.find_one({'_id': ObjectId(comment_id)})
         if not comment:
             return jsonify({'success': False, 'message': '评论不存在'})
         
@@ -437,10 +414,10 @@ def comment_delete(comment_id):
             return jsonify({'success': False, 'message': '没有权限删除此评论'})
         
         # 删除评论
-        db.comments.delete_one({'_id': ObjectId(comment_id)})
+        mongo.db.comments.delete_one({'_id': ObjectId(comment_id)})
         
         # 更新帖子的评论计数
-        db.posts.update_one(
+        mongo.db.posts.update_one(
             {'_id': comment['post_id']},
             {'$inc': {'comment_count': -1}}
         )
@@ -456,73 +433,72 @@ def comment_delete(comment_id):
 def upload_image():
     try:
         if 'image' not in request.files:
-            return jsonify({'success': False, 'message': '没有文件'}), 400
-        
+            current_app.logger.error("No image file in request")
+            return jsonify({'success': False, 'message': '没有找到图片文件'})
+
         file = request.files['image']
         if file.filename == '':
-            return jsonify({'success': False, 'message': '没有选择文件'}), 400
-        
+            current_app.logger.error("No selected file")
+            return jsonify({'success': False, 'message': '未选择文件'})
+
         if file and allowed_file(file.filename):
-            # 保存到 GridFS
-            filename = secure_filename(file.filename)
-            content_type = mimetypes.guess_type(filename)[0] or 'application/octet-stream'
+            try:
+                # 修改这里：移除重复的 filename 参数
+                file_id = mongo.save_file(file.filename, file)
+                url = url_for('main.get_image', file_id=str(file_id))
+                return jsonify({'success': True, 'url': url})
+            except Exception as e:
+                current_app.logger.error(f"Error saving file: {str(e)}")
+                return jsonify({'success': False, 'message': f'保存文件失败: {str(e)}'})
+        else:
+            current_app.logger.error(f"Invalid file type: {file.filename}")
+            return jsonify({'success': False, 'message': '不支持的文件类型'})
             
-            # 存储文件元数据
-            metadata = {
-                'user_id': ObjectId(current_user.get_id()),
-                'upload_time': datetime.utcnow(),
-                'filename': filename,
-                'content_type': content_type
-            }
-            
-            # 将文件保存到 GridFS
-            file_id = fs.put(file, filename=filename, metadata=metadata)
-            
-            # 生成访问URL
-            image_url = url_for('main.get_image', file_id=str(file_id), _external=True)
-            return jsonify({'success': True, 'url': image_url})
-            
-        return jsonify({'success': False, 'message': '不支持的文件类型'}), 400
-    
     except Exception as e:
         current_app.logger.error(f"Upload error: {str(e)}")
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': str(e)})
 
 @bp.route('/image/<file_id>')
 def get_image(file_id):
     try:
-        # 添加调试日志
-        current_app.logger.info(f"Fetching image with ID: {file_id}")
+        # 确保 file_id 是有效的 ObjectId
+        if not ObjectId.is_valid(file_id):
+            current_app.logger.error(f"Invalid ObjectId format: {file_id}")
+            return '', 404
+
+        # 从MongoDB获取图片
+        image = mongo.db.images.find_one({'_id': ObjectId(file_id)})
         
-        # 从 GridFS 获取文件
-        file_data = mongo.db.fs.files.find_one({'_id': ObjectId(file_id)})
-        if file_data:
-            # 获取文件内容
-            chunks = list(mongo.db.fs.chunks.find({'files_id': ObjectId(file_id)}).sort('n', 1))
-            if chunks:
-                # 组合所有块
-                data = b''.join(chunk['data'] for chunk in chunks)
-                # 创建文件对象
-                file_object = io.BytesIO(data)
-                # 获取文件类型
-                content_type = file_data.get('contentType', 'image/jpeg')
-                
-                # 添加调试日志
-                current_app.logger.info(f"Serving image with content type: {content_type}")
-                
-                return send_file(
-                    file_object,
-                    mimetype=content_type,
-                    as_attachment=False,
-                    download_name=file_data.get('filename', 'image.jpg')
-                )
+        # 详细的日志记录
+        current_app.logger.info(f"Attempting to retrieve image: {file_id}")
+        current_app.logger.info(f"Image found: {image is not None}")
         
-        current_app.logger.error(f"Image not found: {file_id}")
-        return "Image not found", 404
+        if not image:
+            current_app.logger.warning(f"Image not found: {file_id}")
+            return '', 404
+
+        if 'data' not in image:
+            current_app.logger.warning(f"No data field in image document: {file_id}")
+            return '', 404
+
+        # 创建内存文件对象
+        image_data = BytesIO(image['data'])
         
+        # 设置缓存控制
+        response = send_file(
+            image_data,
+            mimetype=image.get('content_type', 'image/jpeg'),
+            as_attachment=False,
+            download_name=image.get('filename', 'image.jpg')
+        )
+        response.headers['Cache-Control'] = 'public, max-age=31536000'
+        
+        current_app.logger.info(f"Successfully sent image: {file_id}")
+        return response
+
     except Exception as e:
-        current_app.logger.error(f"Error serving image {file_id}: {str(e)}")
-        return str(e), 500
+        current_app.logger.error(f"Error retrieving image {file_id}: {str(e)}\n{traceback.format_exc()}")
+        return '', 404
 
 # 添加调试路由
 @bp.route('/debug/image/<file_id>')
@@ -545,46 +521,60 @@ def debug_image(file_id):
 @login_required
 def create_post():
     form = PostForm()
+    # 如果是从需求集市页面来的，默认选择 market 类型
+    if request.args.get('type') == 'market' and request.method == 'GET':
+        form.post_type.data = 'market'
+        
     if form.validate_on_submit():
-        post_data = {
-            'title': form.title.data,
-            'content': form.content.data,
-            'category': form.category.data.split(' - ')[0],
-            'author_id': ObjectId(current_user.get_id()),
-            'created_at': datetime.utcnow(),
-            'updated_at': datetime.utcnow(),
-            'views': 0,
-            'likes': 0,
-            'comment_count': 0
-        }
-        
-        # 处理图片上传
-        if form.image.data:
-            file = form.image.data
-            if allowed_file(file.filename):
-                try:
-                    # 保存到 GridFS
-                    filename = secure_filename(file.filename)
-                    metadata = {
-                        'user_id': ObjectId(current_user.get_id()),
-                        'upload_time': datetime.utcnow(),
-                        'filename': filename,
-                        'content_type': file.content_type
-                    }
-                    file_id = fs.put(file, filename=filename, metadata=metadata)
-                    
-                    # 添加图片URL到内容中
-                    image_url = url_for('main.get_image', file_id=str(file_id))
-                    post_data['content'] += f'\n\n![{filename}]({image_url})'
-                    
-                except Exception as e:
-                    flash(f'图片上传失败: {str(e)}', 'danger')
-        
-        db.posts.insert_one(post_data)
-        flash('帖子发布成功！', 'success')
-        return redirect(url_for('main.index'))
-    
-    return render_template('post/create.html', form=form)
+        try:
+            title = form.title.data
+            content = form.content.data
+            post_type = form.post_type.data
+            
+            # 处理预览图片
+            preview_image_id = None
+            if 'preview_image' in request.files:
+                file = request.files['preview_image']
+                if file and file.filename:
+                    if allowed_file(file.filename):
+                        preview_image_id = save_image(file)
+            
+            # 创建帖子
+            post = {
+                'title': title,
+                'content': content,
+                'author_id': ObjectId(current_user.get_id()),
+                'author_name': current_user.username,
+                'created_at': datetime.utcnow(),
+                'updated_at': datetime.utcnow(),
+                'post_type': post_type,
+                'views': 0,
+                'likes': 0,          # 添加点赞数
+                'comment_count': 0   # 添加评论数
+            }
+            
+            if preview_image_id:
+                post['preview_image'] = preview_image_id
+            
+            result = mongo.db.posts.insert_one(post)
+            
+            if result.inserted_id:
+                flash('发布成功！', 'success')
+                # 根据帖子类型跳转到对应页面
+                if post_type == 'market':
+                    return redirect(url_for('main.market'))
+                return redirect(url_for('main.index'))
+            else:
+                flash('发布失败，请重试', 'danger')
+            
+        except Exception as e:
+            current_app.logger.error(f"Error creating post: {str(e)}")
+            flash('发布失败，请重试', 'danger')
+            
+    return render_template('post/create.html', 
+                         form=form, 
+                         title='发布文章',
+                         post_type=request.args.get('type', 'normal'))
 
 @bp.route('/test')
 def test():
@@ -618,4 +608,77 @@ def get_file(file_id):
 
 @bp.route('/market')
 def market():
-    return render_template('market.html', posts=[], pagination={})
+    try:
+        page = request.args.get('page', 1, type=int)
+        per_page = 10
+        skip = (page - 1) * per_page
+        
+        # 只获取需求帖子
+        total = mongo.db.posts.count_documents({'post_type': 'market'})
+        
+        # 获取分页的需求帖子
+        posts = list(mongo.db.posts.find(
+            {'post_type': 'market'}
+        ).sort('created_at', -1).skip(skip).limit(per_page))
+        
+        # 处理每个帖子的预览图片URL
+        for post in posts:
+            if post.get('preview_image'):
+                post['preview_image_url'] = url_for('main.get_image', file_id=post['preview_image'])
+        
+        # 计算总页数
+        total_pages = (total + per_page - 1) // per_page if total > 0 else 0
+        
+        # 创建分页信息
+        pagination = {
+            'page': page,
+            'pages': total_pages,
+            'total': total,
+            'has_prev': page > 1,
+            'has_next': page < total_pages
+        }
+        
+        return render_template('market.html', 
+                             posts=posts,
+                             pagination=pagination)  # 传递分页对象
+                             
+    except Exception as e:
+        current_app.logger.error(f"Error in market route: {str(e)}")
+        return render_template('market.html', 
+                             posts=[],
+                             pagination={'page': 1, 'pages': 0, 'total': 0, 'has_prev': False, 'has_next': False})
+
+@bp.route('/upload_content_image', methods=['POST'])
+@login_required
+def upload_content_image():
+    try:
+        if 'image' not in request.files:
+            return jsonify({'error': '没有上传图片'}), 400
+            
+        file = request.files['image']
+        if not file or not file.filename:
+            return jsonify({'error': '无效的图片'}), 400
+            
+        # 验证文件类型
+        if not allowed_file(file.filename):
+            return jsonify({'error': '不支持的图片格式'}), 400
+            
+        # 保存图片
+        filename = secure_filename(file.filename)
+        content = file.read()
+        
+        # 保存到 MongoDB
+        result = mongo.db.images.insert_one({
+            'content': content,
+            'filename': filename,
+            'upload_date': datetime.utcnow(),
+            'user_id': current_user.get_id()
+        })
+        
+        # 返回图片URL
+        image_url = url_for('main.get_image', file_id=str(result.inserted_id))
+        return jsonify({'url': image_url})
+        
+    except Exception as e:
+        current_app.logger.error(f"Error uploading content image: {str(e)}")
+        return jsonify({'error': '上传失败'}), 500

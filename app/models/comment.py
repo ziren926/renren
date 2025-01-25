@@ -1,26 +1,31 @@
-from app import db
-from datetime import datetime
+from app import mongo
 from bson import ObjectId
+from datetime import datetime
 
 class Comment:
-    def __init__(self, content, post_id, author_id, created_at=None, _id=None):
-        self.content = content
-        self.post_id = post_id
-        self.author_id = author_id
-        self.created_at = created_at if created_at else datetime.utcnow()
-        self._id = _id if _id else ObjectId()
-
+    def __init__(self, comment_data):
+        self.comment_data = comment_data
+        
     @staticmethod
-    def from_db(comment_data):
-        if not comment_data:
-            return None
-        return Comment(
-            content=comment_data['content'],
-            post_id=comment_data['post_id'],
-            author_id=comment_data['author_id'],
-            created_at=comment_data['created_at'],
-            _id=comment_data['_id']
-        )
+    def create(content, post_id, author_id):
+        comment_data = {
+            'content': content,
+            'post_id': post_id,
+            'author_id': author_id,
+            'created_at': datetime.utcnow()
+        }
+        result = mongo.db.comments.insert_one(comment_data)
+        return str(result.inserted_id)
+        
+    @staticmethod
+    def get_by_post_id(post_id):
+        comments = mongo.db.comments.find({'post_id': post_id}).sort('created_at', -1)
+        return list(comments)
+        
+    @staticmethod
+    def get_by_id(comment_id):
+        comment_data = mongo.db.comments.find_one({'_id': ObjectId(comment_id)})
+        return Comment(comment_data) if comment_data else None
 
     def save(self):
         comment_data = {
@@ -31,12 +36,12 @@ class Comment:
         }
         if hasattr(self, '_id'):
             comment_data['_id'] = self._id
-            db.comments.update_one({'_id': self._id}, {'$set': comment_data}, upsert=True)
+            mongo.db.comments.update_one({'_id': self._id}, {'$set': comment_data}, upsert=True)
         else:
-            result = db.comments.insert_one(comment_data)
+            result = mongo.db.comments.insert_one(comment_data)
             self._id = result.inserted_id
             # 更新帖子的评论计数
-            db.posts.update_one(
+            mongo.db.posts.update_one(
                 {'_id': self.post_id},
                 {'$inc': {'comment_count': 1}}
             ) 

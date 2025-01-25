@@ -1,29 +1,60 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="container">
+<div class="container mt-5">
     <div class="row justify-content-center">
         <div class="col-md-6">
-            <div class="card mt-5">
-                <div class="card-body">
-                    <h3 class="card-title text-center mb-4">登录</h3>
-                    <form method="POST">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body p-5">
+                    <h4 class="text-center mb-4">登录</h4>
+                    
+                    <form method="post">
                         {{ form.csrf_token }}
+                        
                         <div class="mb-3">
                             {{ form.username.label(class="form-label") }}
-                            {{ form.username(class="form-control") }}
+                            {{ form.username(class="form-control" + (" is-invalid" if form.username.errors else "")) }}
+                            {% if form.username.errors %}
+                            <div class="invalid-feedback">
+                                {% for error in form.username.errors %}
+                                {{ error }}
+                                {% endfor %}
+                            </div>
+                            {% endif %}
                         </div>
+                        
                         <div class="mb-3">
                             {{ form.password.label(class="form-label") }}
-                            {{ form.password(class="form-control") }}
+                            {{ form.password(class="form-control" + (" is-invalid" if form.password.errors else "")) }}
+                            {% if form.password.errors %}
+                            <div class="invalid-feedback">
+                                {% for error in form.password.errors %}
+                                {{ error }}
+                                {% endfor %}
+                            </div>
+                            {% endif %}
                         </div>
+                        
+                        <div class="mb-3 form-check">
+                            {{ form.remember(class="form-check-input") }}
+                            {{ form.remember.label(class="form-check-label") }}
+                        </div>
+                        
                         <div class="d-grid">
-                            {{ form.submit(class="btn btn-primary") }}
+                            <button type="submit" class="btn" style="background-color: #ea6f5a; color: white;">
+                                登录
+                            </button>
+                        </div>
+                        
+                        <div class="text-center mt-3">
+                            <small class="text-muted">
+                                还没有账号？
+                                <a href="{{ url_for('auth.register') }}" class="text-decoration-none" style="color: #ea6f5a;">
+                                    立即注册
+                                </a>
+                            </small>
                         </div>
                     </form>
-                    <div class="text-center mt-3">
-                        <p>还没有账号？ <a href="{{ url_for('auth.register') }}">立即注册</a></p>
-                    </div>
                 </div>
             </div>
         </div>

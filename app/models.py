@@ -1,6 +1,7 @@
 from flask_login import UserMixin
 from bson import ObjectId
 from werkzeug.security import check_password_hash
+from datetime import datetime
 
 class User(UserMixin):
     def __init__(self, user_data):
@@ -27,4 +28,11 @@ class User(UserMixin):
 
     @staticmethod
     def validate_login(password_hash, password):
-        return check_password_hash(password_hash, password) 
+        return check_password_hash(password_hash, password)
+
+class Comment:
+    def __init__(self, post_id, author_id, content, created_at=None):
+        self.post_id = post_id
+        self.author_id = author_id
+        self.content = content
+        self.created_at = created_at if created_at else datetime.utcnow() 

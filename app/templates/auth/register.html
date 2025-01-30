@@ -3,83 +3,46 @@
 {% block content %}
 <div class="container mt-5">
     <div class="row justify-content-center">
-        <div class="col-md-6">
-            <div class="card border-0 shadow-sm">
-                <div class="card-body p-5">
-                    <h4 class="text-center mb-4">注册账号</h4>
+        <div class="col-md-6 col-lg-5">
+            <div class="card shadow-sm">
+                <div class="card-body p-4">
+                    <h4 class="card-title text-center mb-4">注册新账号</h4>
                     
-                    <form method="post">
-                        {{ form.csrf_token }}
+                    <form method="POST">
+                        {{ form.hidden_tag() }}
                         
                         <div class="mb-3">
                             {{ form.username.label(class="form-label") }}
-                            {{ form.username(class="form-control" + (" is-invalid" if form.username.errors else "")) }}
-                            {% if form.username.errors %}
-                            <div class="invalid-feedback">
-                                {% for error in form.username.errors %}
-                                {{ error }}
-                                {% endfor %}
-                            </div>
-                            {% endif %}
-                            <div class="form-text">用户名只能包含字母、数字和下划线，长度3-20个字符</div>
-                        </div>
-                        
-                        <div class="mb-3">
-                            {{ form.email.label(class="form-label") }}
-                            {{ form.email(class="form-control" + (" is-invalid" if form.email.errors else ""), type="email") }}
-                            {% if form.email.errors %}
-                            <div class="invalid-feedback">
-                                {% for error in form.email.errors %}
-                                {{ error }}
-                                {% endfor %}
-                            </div>
-                            {% endif %}
+                            {{ form.username(class="form-control") }}
+                            {% for error in form.username.errors %}
+                            <div class="text-danger small">{{ error }}</div>
+                            {% endfor %}
                         </div>
                         
                         <div class="mb-3">
                             {{ form.password.label(class="form-label") }}
-                            {{ form.password(class="form-control" + (" is-invalid" if form.password.errors else "")) }}
-                            {% if form.password.errors %}
-                            <div class="invalid-feedback">
-                                {% for error in form.password.errors %}
-                                {{ error }}
-                                {% endfor %}
-                            </div>
-                            {% endif %}
-                            <div class="form-text">
-                                密码必须包含：
-                                <ul class="mb-0">
-                                    <li>大写字母</li>
-                                    <li>小写字母</li>
-                                    <li>数字</li>
-                                    <li>特殊字符（如：!@#$%^&*）</li>
-                                    <li>长度6-20个字符</li>
-                                </ul>
-                            </div>
+                            {{ form.password(class="form-control") }}
+                            {% for error in form.password.errors %}
+                            <div class="text-danger small">{{ error }}</div>
+                            {% endfor %}
                         </div>
                         
-                        <div class="mb-4">
-                            {{ form.confirm.label(class="form-label") }}
-                            {{ form.confirm(class="form-control" + (" is-invalid" if form.confirm.errors else "")) }}
-                            {% if form.confirm.errors %}
-                            <div class="invalid-feedback">
-                                {% for error in form.confirm.errors %}
-                                {{ error }}
-                                {% endfor %}
-                            </div>
-                            {% endif %}
+                        <div class="mb-3">
+                            {{ form.confirm_password.label(class="form-label") }}
+                            {{ form.confirm_password(class="form-control") }}
+                            {% for error in form.confirm_password.errors %}
+                            <div class="text-danger small">{{ error }}</div>
+                            {% endfor %}
                         </div>
                         
-                        <div class="d-grid">
-                            <button type="submit" class="btn" style="background-color: #ea6f5a; color: white;">
-                                注册
-                            </button>
+                        <div class="d-grid gap-2">
+                            {{ form.submit(class="btn btn-primary") }}
                         </div>
                         
                         <div class="text-center mt-3">
                             <small class="text-muted">
-                                已有账号？
-                                <a href="{{ url_for('auth.login') }}" class="text-decoration-none" style="color: #ea6f5a;">
+                                已有账号？ 
+                                <a href="{{ url_for('auth.login') }}" class="text-decoration-none">
                                     立即登录
                                 </a>
                             </small>
@@ -90,16 +53,4 @@
         </div>
     </div>
 </div>
-
-<style>
-.form-text ul {
-    padding-left: 1.2rem;
-    margin-top: 0.5rem;
-    font-size: 0.875em;
-}
-.form-control:focus {
-    border-color: #ea6f5a;
-    box-shadow: 0 0 0 0.2rem rgba(234, 111, 90, 0.25);
-}
-</style>
 {% endblock %}

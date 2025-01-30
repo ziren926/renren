@@ -9,6 +9,7 @@ import os
 import logging
 from logging.handlers import RotatingFileHandler
 from bson import ObjectId
+from .extensions import mongo, login_manager, moment
 
 # 配置日志格式
 logging.basicConfig(
@@ -20,7 +21,6 @@ logging.basicConfig(
 bootstrap = Bootstrap()
 login_manager = LoginManager()
 moment = Moment()
-mongo = PyMongo()
 ckeditor = CKEditor()
 login_manager.login_view = 'auth.login'
 login_manager.login_message = '请先登录'
@@ -36,54 +36,27 @@ def create_app(config_class=Config):
     moment.init_app(app)
     ckeditor.init_app(app)
     
-    # MongoDB 配置
-    try:
-        app.logger.info("="*50)
-        app.logger.info("Renren Web Application Starting...")
-        app.logger.info("Initializing MongoDB connection...")
-        
-        # 从环境变量获取 MongoDB URI
-        mongodb_uri = os.environ.get('MONGODB_URI')
-        if mongodb_uri:
-            app.config['MONGO_URI'] = mongodb_uri
-            app.logger.info(f"MongoDB URI from environment: {mongodb_uri.split('@')[-1]}")  # 只显示主机部分，不显示凭据
-        else:
-            default_uri = 'mongodb://zirenwang163:a1t4kCF2EhoO6D7W@mongo:27017/renren?authSource=admin'
-            app.config['MONGO_URI'] = default_uri
-            app.logger.warning(f"No MONGODB_URI found in environment, using default connection")
-            app.logger.info(f"Default MongoDB URI: {default_uri.split('@')[-1]}")
-        
-        # 初始化 MongoDB
-        mongo.init_app(app)
-        
-        # 测试连接并获取服务器信息
-        with app.app_context():
-            # 测试连接
-            server_info = mongo.db.command('serverStatus')
+    # 初始化 MongoDB
+    mongo.init_app(app)
+    
+    # 确保数据库连接
+    with app.app_context():
+        # 测试数据库连接
+        try:
+            # 尝试访问数据库
+            mongo.db.command('ping')
             app.logger.info("Successfully connected to MongoDB!")
-            app.logger.info(f"MongoDB version: {server_info.get('version', 'Unknown')}")
-            app.logger.info(f"MongoDB server: {server_info.get('host', 'Unknown')}")
+            app.logger.info(f"MongoDB version: {mongo.db.command('buildInfo')['version']}")
+            app.logger.info(f"MongoDB server: {mongo.db.client.address[0]}")
             
-            # 获取并显示可用的数据库
-            dbs = mongo.db.client.list_database_names()
-            app.logger.info(f"Available databases: {', '.join(dbs)}")
-            
-            # 获取当前数据库的统计信息
-            db_stats = mongo.db.command('dbstats')
-            app.logger.info(f"Current database: {mongo.db.name}")
-            app.logger.info(f"Collections count: {db_stats.get('collections', 0)}")
-            app.logger.info(f"Total documents: {db_stats.get('objects', 0)}")
-            
-            app.logger.info("MongoDB initialization completed successfully")
-            app.logger.info("="*50)
-        
-    except Exception as e:
-        app.logger.error("="*50)
-        app.logger.error("MongoDB Connection Error!")
-        app.logger.error(f"Error details: {str(e)}")
-        app.logger.error("Please check your MongoDB configuration and ensure the server is running")
-        app.logger.error("="*50)
-        raise
+            # 确保users集合存在
+            if 'users' not in mongo.db.list_collection_names():
+                mongo.db.create_collection('users')
+                app.logger.info("Created users collection")
+                
+        except Exception as e:
+            app.logger.error(f"MongoDB connection error: {str(e)}")
+            raise
     
     # 配置日志
     if not os.path.exists('logs'):

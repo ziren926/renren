@@ -1,11 +1,11 @@
 from flask import Blueprint, render_template, redirect, url_for, flash, request, current_app
 from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
-from app import mongo  # 改为导入 mongo
-from app.forms import LoginForm, RegisterForm
+from app.forms import LoginForm, RegistrationForm
 from app.models.user import User
 from bson import ObjectId
 from datetime import datetime
+from app.extensions import mongo
 import logging
 
 bp = Blueprint('auth', __name__, url_prefix='/auth')
@@ -15,38 +15,24 @@ def register():
     if current_user.is_authenticated:
         return redirect(url_for('main.index'))
     
-    form = RegisterForm()
+    form = RegistrationForm()
     if form.validate_on_submit():
-        try:
-            # 检查用户名和邮箱是否已存在
-            if mongo.db.users.find_one({'username': form.username.data}):
-                flash('用户名已存在', 'danger')
-                return render_template('auth/register.html', form=form)
-                
-            if mongo.db.users.find_one({'email': form.email.data.lower()}):
-                flash('邮箱已被注册', 'danger')
-                return render_template('auth/register.html', form=form)
+        # 检查用户名是否已存在
+        if mongo.db.users.find_one({'username': form.username.data}):
+            flash('用户名已被使用', 'danger')
+            return redirect(url_for('auth.register'))
             
-            # 创建新用户
-            user = {
-                'username': form.username.data,
-                'email': form.email.data.lower(),
-                'password': generate_password_hash(form.password.data),
-                'created_at': datetime.utcnow()
-            }
-            
-            result = mongo.db.users.insert_one(user)
-            
-            if result.inserted_id:
-                flash('注册成功！请登录', 'success')
-                return redirect(url_for('auth.login'))
-            else:
-                flash('注册失败，请重试', 'danger')
-                
-        except Exception as e:
-            current_app.logger.error(f"Registration error: {str(e)}")
-            flash('注册失败，请重试', 'danger')
-            
+        # 创建新用户
+        user = {
+            'username': form.username.data,
+            'password': generate_password_hash(form.password.data),
+            'created_at': datetime.utcnow()
+        }
+        
+        mongo.db.users.insert_one(user)
+        flash('注册成功，请登录', 'success')
+        return redirect(url_for('auth.login'))
+        
     return render_template('auth/register.html', form=form)
 
 @bp.route('/login', methods=['GET', 'POST'])

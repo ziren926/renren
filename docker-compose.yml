@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  web:
+    build: .
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./logs:/app/logs
+      - ./uploads:/app/uploads
+    environment:
+      - SECRET_KEY=your-super-secret-key
+    depends_on:
+      - mongo
+
+  mongo:
+    image: mongo
+    ports:
+      - "27017:27017"
+
+volumes:
+  mongodb_data:

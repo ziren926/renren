@@ -2,7 +2,11 @@ import os
 
 class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev'
-    MONGO_URI = 'mongodb+srv://zirenwang163:a1t4kCF2EhoO6D7W@cluster0.iotq8.mongodb.net/renren?retryWrites=true&w=majority&appName=Cluster0'
+    UPLOAD_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads')
+    MAX_CONTENT_LENGTH = 3 * 1024 * 1024  # 3MB
+    
+    # MongoDB 配置 - 从环境变量获取，如果没有则使用默认值
+    MONGO_URI = os.environ.get('MONGODB_URI') or 'mongodb://zirenwang163:a1t4kCF2EhoO6D7W@mongo:27017/renren?authSource=admin'
     
     # CKEditor 配置
     CKEDITOR_SERVE_LOCAL = True

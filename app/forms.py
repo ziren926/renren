@@ -26,9 +26,11 @@ class RegistrationForm(FlaskForm):
     submit = SubmitField('注册')
 
 class PostForm(FlaskForm):
-    title = StringField('标题', validators=[DataRequired(), Length(min=1, max=100)])
+    title = StringField('标题', validators=[DataRequired(), Length(min=1, max=200)])
     content = TextAreaField('内容', validators=[DataRequired()])
-    preview_image = FileField('预览图片')
+    preview_image = FileField('预览图片', validators=[
+        FileAllowed(['jpg', 'jpeg', 'png', 'gif'], '只允许上传图片文件!')
+    ])
     post_type = SelectField('类型', choices=[
         ('normal', '经验分享'),
         ('market', '需求帖')

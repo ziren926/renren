@@ -74,35 +74,38 @@ def index():
                              total_pages=0,
                              total=0)
 
-@bp.route('/post/new', methods=['GET', 'POST'])
+@bp.route('/new_post', methods=['GET', 'POST'])
 @login_required
 def new_post():
-    if request.method == 'POST':
-        try:
-            title = request.form.get('title')
-            content = request.form.get('ckeditor')  # 注意这里改成了 'ckeditor'
-            category = request.form.get('category')
-            
-            if not all([title, content, category]):
-                flash('请填写所有必填字段', 'error')
-                return render_template('post/new.html')
-            
-            post = Post(
-                title=title,
-                content=content,
-                category=category,
-                author_id=ObjectId(current_user.get_id())
-            )
-            post.save()
-            
-            flash('帖子发布成功！', 'success')
-            return redirect(url_for('main.index'))
-            
-        except Exception as e:
-            flash(f'发布失败：{str(e)}', 'error')
-            return render_template('post/new.html')
+    form = PostForm()
+    if form.validate_on_submit():
+        post = {
+            'title': form.title.data,
+            'content': form.content.data,
+            'author_id': ObjectId(current_user.id),
+            'author_name': current_user.username,
+            'created_at': datetime.utcnow(),
+            'updated_at': datetime.utcnow()
+        }
         
-    return render_template('post/new.html')
+        # 处理图片上传
+        if form.preview_image.data:
+            image_file = form.preview_image.data
+            if image_file:
+                # 保存图片到GridFS
+                file_id = fs.put(
+                    image_file,
+                    filename=secure_filename(image_file.filename),
+                    content_type=image_file.content_type
+                )
+                post['preview_image'] = file_id
+        
+        # 保存帖子
+        mongo.db.posts.insert_one(post)
+        flash('帖子发布成功!', 'success')
+        return redirect(url_for('main.index'))
+        
+    return render_template('main/new_post.html', form=form)
 
 @bp.route('/edit/<post_id>', methods=['GET', 'POST'])
 @login_required

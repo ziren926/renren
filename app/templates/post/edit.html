@@ -45,10 +45,10 @@
                             {% endif %}
                         </div>
                         <div class="mb-3">
-                            {{ form.image.label(class="form-label") }}
-                            {{ form.image(class="form-control" + (" is-invalid" if form.image.errors else ""), onchange="previewImage(this);") }}
-                            {% if form.image.errors %}
-                                {% for error in form.image.errors %}
+                            {{ form.preview_image.label(class="form-label") }}
+                            {{ form.preview_image(class="form-control" + (" is-invalid" if form.preview_image.errors else ""), onchange="previewImage(this);") }}
+                            {% if form.preview_image.errors %}
+                                {% for error in form.preview_image.errors %}
                                     <div class="invalid-feedback">{{ error }}</div>
                                 {% endfor %}
                             {% endif %}

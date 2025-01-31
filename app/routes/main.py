@@ -124,28 +124,22 @@ def edit_post(post_id):
         form = PostForm()
         
         if form.validate_on_submit():
-            title = form.title.data
-            content = form.content.data
-            
-            # 处理预览图片
-            preview_image_id = post.get('preview_image')  # 保持原有图片ID
-            if 'preview_image' in request.files:
-                file = request.files['preview_image']
-                if file and file.filename:
-                    if allowed_file(file.filename):
-                        new_image_id = save_image(file)
-                        if new_image_id:
-                            preview_image_id = new_image_id
-            
-            # 更新帖子
             update_data = {
-                'title': title,
-                'content': content,
+                'title': form.title.data,
+                'content': form.content.data,
                 'updated_at': datetime.utcnow()
             }
             
-            if preview_image_id:
-                update_data['preview_image'] = preview_image_id
+            # 处理预览图片
+            if form.preview_image.data:  # 改用 preview_image 而不是 image
+                file = form.preview_image.data
+                if file:
+                    file_id = fs.put(
+                        file,
+                        filename=secure_filename(file.filename),
+                        content_type=file.content_type
+                    )
+                    update_data['preview_image'] = file_id
             
             mongo.db.posts.update_one(
                 {'_id': ObjectId(post_id)},
@@ -153,19 +147,13 @@ def edit_post(post_id):
             )
             
             flash('更新成功！', 'success')
-            # 根据帖子类型返回相应页面
-            if post.get('post_type') == 'market':
-                return redirect(url_for('main.market'))
-            return redirect(url_for('main.index'))
+            return redirect(url_for('main.post_detail', post_id=post_id))
             
         elif request.method == 'GET':
             form.title.data = post.get('title')
             form.content.data = post.get('content')
             
-        return render_template('post/edit.html', 
-                             form=form, 
-                             post=post,
-                             title='编辑文章')
+        return render_template('post/edit.html', form=form, post=post)
                              
     except Exception as e:
         current_app.logger.error(f"Error editing post: {str(e)}")

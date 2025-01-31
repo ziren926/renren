@@ -1,11 +1,19 @@
 from flask_pymongo import PyMongo
 from flask_login import LoginManager
 from flask_moment import Moment
+from gridfs import GridFS
 
-# 初始化扩展，但不传入 app
+# 初始化扩展
 mongo = PyMongo()
 login_manager = LoginManager()
 moment = Moment()
+
+# 初始化 GridFS
+fs = None
+
+def init_fs(app):
+    global fs
+    fs = GridFS(mongo.db)
 
 # 配置 login_manager
 login_manager.login_view = 'auth.login'

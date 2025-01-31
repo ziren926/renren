@@ -20,6 +20,8 @@ from PIL import Image
 from app.utils import save_image  # 添加这行导入
 from io import BytesIO
 from pymongo import TEXT, ASCENDING
+from app.extensions import fs  # 添加 fs 的导入
+from gridfs.errors import NoFile
 
 bp = Blueprint('main', __name__, url_prefix='')
 
@@ -131,13 +133,16 @@ def edit_post(post_id):
             }
             
             # 处理预览图片
-            if form.preview_image.data:  # 改用 preview_image 而不是 image
+            if form.preview_image.data:
                 file = form.preview_image.data
-                if file:
+                if file and allowed_file(file.filename):
+                    # 确保获取正确的content_type
+                    content_type = file.content_type or 'image/' + file.filename.rsplit('.', 1)[1].lower()
+                    
                     file_id = fs.put(
                         file,
                         filename=secure_filename(file.filename),
-                        content_type=file.content_type
+                        content_type=content_type
                     )
                     update_data['preview_image'] = file_id
             
@@ -452,44 +457,27 @@ def upload_image():
 @bp.route('/image/<file_id>')
 def get_image(file_id):
     try:
-        # 确保 file_id 是有效的 ObjectId
-        if not ObjectId.is_valid(file_id):
-            current_app.logger.error(f"Invalid ObjectId format: {file_id}")
-            return '', 404
-
-        # 从MongoDB获取图片
-        image = mongo.db.images.find_one({'_id': ObjectId(file_id)})
+        # 尝试从GridFS获取图片
+        file_data = fs.get(ObjectId(file_id))
         
-        # 详细的日志记录
-        current_app.logger.info(f"Attempting to retrieve image: {file_id}")
-        current_app.logger.info(f"Image found: {image is not None}")
-        
-        if not image:
-            current_app.logger.warning(f"Image not found: {file_id}")
-            return '', 404
-
-        if 'data' not in image:
-            current_app.logger.warning(f"No data field in image document: {file_id}")
-            return '', 404
-
-        # 创建内存文件对象
-        image_data = BytesIO(image['data'])
-        
-        # 设置缓存控制
+        # 设置正确的Content-Type
         response = send_file(
-            image_data,
-            mimetype=image.get('content_type', 'image/jpeg'),
+            io.BytesIO(file_data.read()),
+            mimetype=file_data.content_type,
             as_attachment=False,
-            download_name=image.get('filename', 'image.jpg')
+            download_name=file_data.filename
         )
-        response.headers['Cache-Control'] = 'public, max-age=31536000'
         
-        current_app.logger.info(f"Successfully sent image: {file_id}")
+        # 添加缓存控制
+        response.headers['Cache-Control'] = 'public, max-age=31536000'
         return response
-
-    except Exception as e:
-        current_app.logger.error(f"Error retrieving image {file_id}: {str(e)}\n{traceback.format_exc()}")
+        
+    except NoFile:
+        current_app.logger.warning(f"Image not found: {file_id}")
         return '', 404
+    except Exception as e:
+        current_app.logger.error(f"Error serving image: {str(e)}")
+        return '', 500
 
 # 添加调试路由
 @bp.route('/debug/image/<file_id>')

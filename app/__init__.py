@@ -9,7 +9,7 @@ import os
 import logging
 from logging.handlers import RotatingFileHandler
 from bson import ObjectId
-from .extensions import mongo, login_manager, moment
+from .extensions import mongo, login_manager, moment, init_fs
 
 # 配置日志格式
 logging.basicConfig(
@@ -38,6 +38,9 @@ def create_app(config_class=Config):
     
     # 初始化 MongoDB
     mongo.init_app(app)
+    
+    with app.app_context():
+        init_fs(app)  # 初始化 GridFS
     
     # 确保数据库连接
     with app.app_context():

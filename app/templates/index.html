@@ -128,11 +128,12 @@
     </div>
 </div>
 
-<div class="mobile-hot-posts">
+<!-- 移动端热门文章 - 只在移动端显示 -->
+<div class="mobile-hot-posts d-md-none">
     <div class="mobile-hot-title">
         <i class="fas fa-fire"></i>热门文章
     </div>
-    {% for post in hot_posts[:5] %}  <!-- 只显示前5篇热门文章 -->
+    {% for post in hot_posts[:5] %}
     <div class="mobile-hot-item">
         <div class="mobile-hot-number {% if loop.index <= 3 %}top-3{% endif %}">
             {{ loop.index }}
@@ -400,6 +401,13 @@
         .mobile-hot-posts {
             display: none !important;
         }
+    }
+}
+
+/* 在非移动端隐藏移动版热门文章 */
+@media (min-width: 768px) {
+    .mobile-hot-posts {
+        display: none !important;
     }
 }
 </style>

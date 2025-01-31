@@ -4,14 +4,26 @@ from app import login_manager, mongo
 from bson import ObjectId
 
 class User(UserMixin):
-    def __init__(self, username, email, password_hash=None, _id=None):
-        self.username = username
-        self.email = email
-        self.password_hash = password_hash
-        self._id = _id if _id else ObjectId()
-    
+    def __init__(self, user_data):
+        self.user_data = user_data
+        self.id = str(user_data.get('_id'))
+        self.username = user_data.get('username')
+        
+    @staticmethod
+    def get_by_id(user_id):
+        try:
+            user_data = mongo.db.users.find_one({'_id': ObjectId(user_id)})
+            return User(user_data) if user_data else None
+        except:
+            return None
+            
+    @staticmethod
+    def get_by_username(username):
+        user_data = mongo.db.users.find_one({'username': username})
+        return User(user_data) if user_data else None
+
     def get_id(self):
-        return str(self._id)
+        return str(self.id)
 
     @property
     def is_authenticated(self):
@@ -29,51 +41,23 @@ class User(UserMixin):
     def validate_login(password_hash, password):
         return check_password_hash(password_hash, password)
 
-    @staticmethod
-    def get_by_username(username):
-        user_data = mongo.db.users.find_one({'username': username})
-        if user_data:
-            return User(
-                username=user_data['username'],
-                email=user_data['email'],
-                password_hash=user_data['password_hash'],
-                _id=user_data['_id']
-            )
-        return None
-
-    @staticmethod
-    def get_by_id(user_id):
-        try:
-            user_data = mongo.db.users.find_one({'_id': ObjectId(user_id)})
-            if user_data:
-                return User(
-                    username=user_data['username'],
-                    email=user_data['email'],
-                    password_hash=user_data['password_hash'],
-                    _id=user_data['_id']
-                )
-        except:
-            pass
-        return None
-
     def save(self):
         user_data = {
-            '_id': self._id,
+            '_id': self.id,
             'username': self.username,
-            'email': self.email,
-            'password_hash': self.password_hash
+            'password_hash': self.user_data['password_hash']
         }
         mongo.db.users.update_one(
-            {'_id': self._id},
+            {'_id': self.id},
             {'$set': user_data},
             upsert=True
         )
 
     def set_password(self, password):
-        self.password_hash = generate_password_hash(password)
+        self.user_data['password_hash'] = generate_password_hash(password)
 
     def check_password(self, password):
-        return check_password_hash(self.password_hash, password)
+        return check_password_hash(self.user_data['password_hash'], password)
 
     @staticmethod
     def get(user_id):
@@ -82,7 +66,7 @@ class User(UserMixin):
         try:
             user_data = mongo.db.users.find_one({'_id': ObjectId(user_id)})
             if user_data:
-                return User(user_data['username'], user_data['email'], user_data['password_hash'], user_data['_id'])
+                return User(user_data)
             return None
         except:
             return None
@@ -92,7 +76,7 @@ def load_user(user_id):
     try:
         user_data = mongo.db.users.find_one({'_id': ObjectId(user_id)})
         if user_data:
-            return User(user_data['username'], user_data['email'], user_data['password_hash'], user_data['_id'])
+            return User(user_data)
     except Exception as e:
         return None
     return None 

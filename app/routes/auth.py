@@ -42,36 +42,12 @@ def login():
         
     form = LoginForm()
     if form.validate_on_submit():
-        try:
-            # 获取表单数据
-            username = form.username.data
-            password = form.password.data
-            
-            # 查找用户
-            user_data = mongo.db.users.find_one({'username': username})
-            
-            if user_data and 'password' in user_data and check_password_hash(user_data['password'], password):
-                # 创建用户对象
-                user = User(str(user_data['_id']))
-                
-                # 登录用户
-                remember = form.remember.data if hasattr(form, 'remember') else False
-                login_user(user, remember=remember)
-                
-                # 获取下一页URL
-                next_page = request.args.get('next')
-                if not next_page or not next_page.startswith('/'):
-                    next_page = url_for('main.index')
-                    
-                flash('登录成功！', 'success')
-                return redirect(next_page)
-            else:
-                flash('用户名或密码错误', 'danger')
-                
-        except Exception as e:
-            current_app.logger.error(f"Login error: {str(e)}")
-            flash('登录过程中发生错误', 'danger')
-            
+        user = User.get_by_username(form.username.data)
+        if user and check_password_hash(user.user_data.get('password'), form.password.data):
+            login_user(user)
+            next_page = request.args.get('next')
+            return redirect(next_page if next_page else url_for('main.index'))
+        flash('用户名或密码错误', 'danger')
     return render_template('auth/login.html', form=form)
 
 @bp.route('/logout')

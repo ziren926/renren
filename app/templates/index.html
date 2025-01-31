@@ -97,33 +97,6 @@
                     {% endfor %}
                 </div>
             </div>
-
-            <!-- 最近发表 -->
-            <div class="sidebar-section">
-                <h5 class="sidebar-title">
-                    <i class="fas fa-clock text-primary me-2"></i>最近发表
-                    <span class="title-line"></span>
-                </h5>
-                <div class="recent-posts mt-3 indent">
-                    {% for post in recent_posts %}
-                    <div class="recent-post-item mb-3">
-                        <a href="{{ url_for('main.post_detail', post_id=post._id) }}" 
-                           class="text-decoration-none">
-                            <div class="recent-post-title text-dark mb-2">{{ post.title }}</div>
-                            <div class="recent-post-meta">
-                                <span class="meta-item">
-                                    <i class="fas fa-user-edit me-1"></i>{{ post.author_name }}
-                                </span>
-                                <span class="meta-divider mx-2">·</span>
-                                <span class="meta-item">
-                                    <i class="fas fa-calendar-alt me-1"></i>{{ post.created_at.strftime('%m-%d') }}
-                                </span>
-                            </div>
-                        </a>
-                    </div>
-                    {% endfor %}
-                </div>
-            </div>
         </div>
     </div>
 </div>
@@ -223,21 +196,7 @@
     white-space: nowrap;
 }
 
-.recent-post-title {
-    font-size: 14px;
-    line-height: 1.5;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.recent-post-meta {
-    font-size: 12px;
-    color: #b4b4b4;
-}
-
-.hot-post-item a:hover .hot-title,
-.recent-post-item a:hover .recent-post-title {
+.hot-post-item a:hover .hot-title {
     color: #ea6f5a !important;
 }
 

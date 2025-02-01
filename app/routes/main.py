@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, redirect, url_for, flash, request, current_app, jsonify, send_file
+from flask import Blueprint, render_template, redirect, url_for, flash, request, current_app, jsonify, send_file, abort
 from flask_login import current_user, login_required
 from .. import mongo
 from bson import ObjectId
@@ -308,12 +308,7 @@ def allowed_file(filename):
 @bp.route('/post/<post_id>')
 def post_detail(post_id):
     try:
-        # 验证 post_id 格式
-        if not ObjectId.is_valid(post_id):
-            flash('无效的帖子ID', 'danger')
-            return redirect(url_for('main.index'))
-            
-        # 获取帖子并增加浏览量
+        # 获取帖子信息
         post = mongo.db.posts.find_one_and_update(
             {'_id': ObjectId(post_id)},
             {'$inc': {'views': 1}},
@@ -321,32 +316,56 @@ def post_detail(post_id):
         )
         
         if not post:
-            flash('帖子不存在', 'danger')
-            return redirect(url_for('main.index'))
+            abort(404)
             
-        # 获取作者信息
+        # 处理文章内容中的图片URL
+        if post.get('content'):
+            content = post['content']
+            # 替换图片URL为正确的路由
+            content = content.replace('/file/', '/serve_file/')
+            post['content'] = content
+        
+        # 获取评论
+        comments = list(mongo.db.comments.find({'post_id': ObjectId(post_id)}).sort('created_at', -1))
+        
+        # 获取作者信息和统计
         author = mongo.db.users.find_one({'_id': post['author_id']})
+        author_stats = {
+            'posts_count': author.get('post_count', 0),
+            'total_likes': author.get('total_likes', 0),
+            'total_words': author.get('total_words', 0),
+            'join_date': author.get('created_at', datetime.utcnow()),
+            'last_post_at': author.get('last_post_at'),
+            'avatar_url': author.get('avatar_url', url_for('static', filename='images/default-avatar.png'))
+        }
         
-        # 确定返回按钮的目标页面
-        back_url = url_for('main.market') if post.get('post_type') == 'market' else url_for('main.index')
+        # 获取作者最近的帖子
+        recent_posts = list(
+            mongo.db.posts.find(
+                {'author_id': post['author_id'], '_id': {'$ne': ObjectId(post_id)}}
+            ).sort('created_at', -1).limit(5)
+        )
         
-        # 处理预览图片URL
-        if post.get('preview_image'):
-            post['preview_image_url'] = url_for('main.get_image', file_id=post['preview_image'])
+        # 获取相关帖子（基于标签）
+        related_posts = []
+        if 'tags' in post:
+            related_posts = list(
+                mongo.db.posts.find({
+                    '_id': {'$ne': ObjectId(post_id)},
+                    'tags': {'$in': post['tags']}
+                }).limit(3)
+            )
         
-        # 创建评论表单
-        form = CommentForm()
-        
-        return render_template('post/detail.html', 
+        return render_template('post/detail.html',
                              post=post,
-                             author=author,
-                             back_url=back_url,
-                             form=form)  # 添加表单到模板上下文
+                             comments=comments,
+                             author_stats=author_stats,
+                             recent_posts=recent_posts,
+                             related_posts=related_posts)
                              
     except Exception as e:
-        current_app.logger.error(f"Error viewing post: {str(e)}\n{traceback.format_exc()}")
-        flash('获取帖子失败', 'danger')
-        return redirect(url_for('main.index'))
+        current_app.logger.error(f"Error loading post detail: {str(e)}")
+        abort(500)
 
 @bp.route('/post/<post_id>/like', methods=['POST'])
 @login_required
@@ -500,7 +519,6 @@ def debug_image(file_id):
 @login_required
 def create_post():
     form = PostForm()
-    # 如果是从需求集市页面来的，默认选择 market 类型
     if request.args.get('type') == 'market' and request.method == 'GET':
         form.post_type.data = 'market'
         
@@ -514,11 +532,10 @@ def create_post():
             preview_image_id = None
             if 'preview_image' in request.files:
                 file = request.files['preview_image']
-                if file and file.filename:
-                    if allowed_file(file.filename):
-                        preview_image_id = save_image(file)
+                if file and file.filename and allowed_file(file.filename):
+                    preview_image_id = save_image(file)
             
-            # 创建帖子
+            # 创建帖子，添加新字段
             post = {
                 'title': title,
                 'content': content,
@@ -528,8 +545,13 @@ def create_post():
                 'updated_at': datetime.utcnow(),
                 'post_type': post_type,
                 'views': 0,
-                'likes': 0,          # 添加点赞数
-                'comment_count': 0   # 添加评论数
+                'likes': 0,
+                'comment_count': 0,
+                'reading_time': estimate_reading_time(content),  # 估计阅读时间
+                'summary': generate_summary(content),  # 生成摘要
+                'tags': extract_tags(content),  # 提取标签
+                'toc': generate_toc(content),  # 生成目录结构
+                'word_count': len(content)  # 字数统计
             }
             
             if preview_image_id:
@@ -538,8 +560,22 @@ def create_post():
             result = mongo.db.posts.insert_one(post)
             
             if result.inserted_id:
+                # 更新用户统计信息
+                mongo.db.users.update_one(
+                    {'_id': ObjectId(current_user.get_id())},
+                    {
+                        '$inc': {
+                            'post_count': 1,
+                            'total_words': len(content)
+                        },
+                        '$set': {
+                            'last_post_at': datetime.utcnow()
+                        }
+                    },
+                    upsert=True
+                )
+                
                 flash('发布成功！', 'success')
-                # 根据帖子类型跳转到对应页面
                 if post_type == 'market':
                     return redirect(url_for('main.market'))
                 return redirect(url_for('main.index'))
@@ -554,6 +590,44 @@ def create_post():
                          form=form, 
                          title='发布文章',
                          post_type=request.args.get('type', 'normal'))
+
+# 添加辅助函数
+def estimate_reading_time(content):
+    """估计阅读时间（分钟）"""
+    words_per_minute = 500  # 假设平均阅读速度
+    word_count = len(content)
+    minutes = max(1, round(word_count / words_per_minute))
+    return minutes
+
+def generate_summary(content, max_length=200):
+    """生成文章摘要"""
+    # 移除HTML标签
+    text = re.sub(r'<[^>]+>', '', content)
+    # 取前200个字符
+    summary = text[:max_length].strip()
+    if len(text) > max_length:
+        summary += '...'
+    return summary
+
+def extract_tags(content):
+    """从内容中提取标签"""
+    # 这里可以实现标签提取逻辑
+    # 例如：提取 #标签# 格式的内容
+    tags = re.findall(r'#([^#]+)#', content)
+    return list(set(tags))  # 去重
+
+def generate_toc(content):
+    """生成目录结构"""
+    toc = []
+    # 使用正则表达式匹配HTML标题标签
+    headers = re.findall(r'<h([1-6])([^>]*)>(.*?)</h\1>', content)
+    for level, attrs, title in headers:
+        toc.append({
+            'level': int(level),
+            'title': re.sub(r'<[^>]+>', '', title),  # 移除标题中的HTML标签
+            'id': f'section-{len(toc)}'
+        })
+    return toc
 
 @bp.route('/test')
 def test():
@@ -661,3 +735,96 @@ def upload_content_image():
     except Exception as e:
         current_app.logger.error(f"Error uploading content image: {str(e)}")
         return jsonify({'error': '上传失败'}), 500
+
+@bp.route('/serve_file/<file_id>')
+def serve_file(file_id):
+    try:
+        if not file_id:
+            return "Invalid file ID", 400
+
+        # 从 GridFS 获取文件
+        file_data = mongo.db.fs.get(ObjectId(file_id))
+        
+        # 读取文件内容
+        file_content = file_data.read()
+        content_type = getattr(file_data, 'content_type', 'image/jpeg')
+        
+        # 如果是图片，处理大小
+        if content_type.startswith('image/'):
+            try:
+                # 打开图片
+                img = Image.open(io.BytesIO(file_content))
+                
+                # 计算新尺寸
+                max_size = 200
+                width, height = img.size
+                if width > max_size:
+                    # 计算缩放比例
+                    ratio = max_size / width
+                    new_size = (max_size, int(height * ratio))
+                    
+                    # 调整大小
+                    img = img.resize(new_size, Image.LANCZOS)
+                    
+                    # 保存调整后的图片
+                    output = io.BytesIO()
+                    img.save(output, format=img.format or 'JPEG', quality=85)
+                    file_content = output.getvalue()
+            
+            except Exception as e:
+                current_app.logger.error(f"Error processing image: {str(e)}")
+                # 如果处理失败，使用原始图片
+        
+        response = send_file(
+            io.BytesIO(file_content),
+            mimetype=content_type,
+            download_name=getattr(file_data, 'filename', 'image.jpg'),
+            as_attachment=False
+        )
+        
+        # 设置缓存控制
+        response.headers['Cache-Control'] = 'public, max-age=31536000'
+        return response
+
+    except Exception as e:
+        current_app.logger.error(f"Error serving file {file_id}: {str(e)}")
+        return str(e), 500
+
+@bp.route('/author/<author_id>')
+def author_profile(author_id):
+    try:
+        # 获取作者信息
+        author = mongo.db.users.find_one({'_id': ObjectId(author_id)})
+        if not author:
+            abort(404)
+            
+        # 获取作者统计信息
+        posts_count = mongo.db.posts.count_documents({'author_id': ObjectId(author_id)})
+        total_likes = sum(p.get('likes', 0) for p in mongo.db.posts.find({'author_id': ObjectId(author_id)}))
+        total_views = sum(p.get('views', 0) for p in mongo.db.posts.find({'author_id': ObjectId(author_id)}))
+        
+        # 获取作者的帖子，按时间倒序
+        posts = list(mongo.db.posts.find(
+            {'author_id': ObjectId(author_id)}
+        ).sort('created_at', -1))
+        
+        # 计算每月发帖数量
+        posts_by_month = {}
+        for post in posts:
+            month_key = post['created_at'].strftime('%Y-%m')
+            posts_by_month[month_key] = posts_by_month.get(month_key, 0) + 1
+            
+        return render_template('author/profile.html',
+                             author=author,
+                             posts=posts,
+                             stats={
+                                 'posts_count': posts_count,
+                                 'total_likes': total_likes,
+                                 'total_views': total_views,
+                                 'join_date': author.get('created_at'),
+                                 'posts_by_month': posts_by_month
+                             })
+                             
+    except Exception as e:
+        current_app.logger.error(f"Error loading author profile: {str(e)}")
+        abort(500)

@@ -1,0 +1,235 @@
+{% extends 'base.html' %}
+
+{% block styles %}
+<style>
+/* 作者详情页样式 */
+.author-profile {
+    background-color: #FFFFFF;
+    padding: 3rem 0;
+}
+
+.author-header {
+    text-align: center;
+    margin-bottom: 3rem;
+}
+
+.author-avatar {
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    margin-bottom: 1.5rem;
+}
+
+.author-name {
+    font-size: 2rem;
+    font-weight: 600;
+    color: #05192D;
+    margin-bottom: 1rem;
+}
+
+.author-stats {
+    display: flex;
+    justify-content: center;
+    gap: 3rem;
+    margin-bottom: 2rem;
+}
+
+.stat-item {
+    text-align: center;
+}
+
+.stat-number {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: #0052CC;
+    margin-bottom: 0.5rem;
+}
+
+.stat-label {
+    font-size: 0.9rem;
+    color: #6B7C93;
+}
+
+.join-date {
+    color: #6B7C93;
+    font-size: 0.9rem;
+}
+
+/* 文章列表样式 */
+.posts-section {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 0 1rem;
+}
+
+.section-title {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: #05192D;
+    margin-bottom: 2rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid #E9ECEF;
+}
+
+.post-card {
+    padding: 1.5rem 0;
+    border-bottom: 1px solid #E9ECEF;
+}
+
+.post-card:last-child {
+    border-bottom: none;
+}
+
+.post-title {
+    font-size: 1.2rem;
+    font-weight: 500;
+    color: #05192D;
+    margin-bottom: 0.5rem;
+    text-decoration: none;
+}
+
+.post-title:hover {
+    color: #0052CC;
+}
+
+.post-meta {
+    font-size: 0.9rem;
+    color: #6B7C93;
+    margin-bottom: 1rem;
+}
+
+.post-summary {
+    color: #37465B;
+    font-size: 1rem;
+    line-height: 1.6;
+}
+
+/* 活动图表样式 */
+.activity-section {
+    margin-top: 4rem;
+}
+
+.activity-chart {
+    background-color: #F8FAFC;
+    border-radius: 8px;
+    padding: 2rem;
+}
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+    .author-stats {
+        gap: 1.5rem;
+    }
+    
+    .stat-number {
+        font-size: 1.2rem;
+    }
+    
+    .posts-section {
+        padding: 0 1rem;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="author-profile">
+    <div class="container">
+        <!-- 作者头部信息 -->
+        <div class="author-header">
+            <img src="{{ author.avatar_url or url_for('static', filename='images/default-avatar.png') }}" 
+                 alt="{{ author.username }}" 
+                 class="author-avatar">
+            <h1 class="author-name">{{ author.username }}</h1>
+            
+            <div class="author-stats">
+                <div class="stat-item">
+                    <div class="stat-number">{{ stats.posts_count }}</div>
+                    <div class="stat-label">文章</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number">{{ stats.total_likes }}</div>
+                    <div class="stat-label">获赞</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number">{{ stats.total_views }}</div>
+                    <div class="stat-label">浏览</div>
+                </div>
+            </div>
+            
+            <div class="join-date">
+                加入于 {{ stats.join_date.strftime('%Y年%m月%d日') }}
+            </div>
+        </div>
+
+        <!-- 文章列表 -->
+        <div class="posts-section">
+            <h2 class="section-title">最新文章</h2>
+            {% for post in posts %}
+            <div class="post-card">
+                <a href="{{ url_for('main.post_detail', post_id=post._id) }}" class="post-title">
+                    {{ post.title }}
+                </a>
+                <div class="post-meta">
+                    发布于 {{ post.created_at.strftime('%Y-%m-%d') }} · 
+                    {{ post.views }} 次浏览 · 
+                    {{ post.likes }} 次点赞
+                </div>
+                {% if post.summary %}
+                <div class="post-summary">
+                    {{ post.summary }}
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- 活动图表 -->
+        <div class="activity-section posts-section">
+            <h2 class="section-title">发帖活跃度</h2>
+            <div class="activity-chart">
+                <!-- 这里可以添加活动图表，使用 Chart.js 等库 -->
+                <div id="activity-chart"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // 准备活动图表数据
+    const postsByMonth = {{ stats.posts_by_month|tojson }};
+    const labels = Object.keys(postsByMonth).sort();
+    const data = labels.map(label => postsByMonth[label]);
+    
+    // 创建活动图表
+    const ctx = document.getElementById('activity-chart').getContext('2d');
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: '发帖数量',
+                data: data,
+                backgroundColor: '#0052CC',
+                borderRadius: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        stepSize: 1
+                    }
+                }
+            }
+        }
+    });
+});
+</script>
+{% endblock %}
+{% endblock %} 

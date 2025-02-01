@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+
+{% block styles %}
+{{ super() }}
+<!-- 只保留 WangEditor 的样式 -->
+<link href="https://cdn.jsdelivr.net/npm/@wangeditor/editor@latest/dist/css/style.css" rel="stylesheet">
+<!-- 移除 CKEditor 相关样式 -->
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="card">
+        <div class="card-body">
+            <h5 class="card-title">发布新帖子</h5>
+            <form method="POST" enctype="multipart/form-data">
+                {{ form.hidden_tag() }}
+                <div class="mb-3">
+                    {{ form.title.label(class="form-label") }}
+                    {{ form.title(class="form-control") }}
+                </div>
+                <div class="mb-3">
+                    {{ form.post_type.label(class="form-label") }}
+                    {{ form.post_type(class="form-select") }}
+                </div>
+                <div class="mb-3">
+                    {{ form.content.label(class="form-label") }}
+                    <div id="toolbar-container"></div>
+                    <div id="editor-container" style="min-height: 300px; border: 1px solid #ccc; border-radius: 4px;"></div>
+                    {{ form.content(style="display: none;", id="content") }}
+                </div>
+                <div class="mb-3">
+                    {{ form.preview_image.label(class="form-label") }}
+                    {{ form.preview_image(class="form-control") }}
+                </div>
+                <div class="mb-3">
+                    {{ form.submit(class="btn btn-primary") }}
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<!-- 只保留 WangEditor 的脚本 -->
+<script src="https://cdn.jsdelivr.net/npm/@wangeditor/editor@latest/dist/index.min.js"></script>
+<!-- 移除 CKEditor 相关脚本 -->
+<script>
+    const { createEditor, createToolbar } = window.wangEditor
+
+    const editorConfig = {
+        placeholder: '请输入内容...',
+        onChange(editor) {
+            const content = editor.getHtml()
+            document.querySelector('#content').value = content
+        },
+        MENU_CONF: {
+            uploadImage: {
+                server: '/upload_content_image',
+                fieldName: 'image',
+                maxFileSize: 10 * 1024 * 1024,
+                allowedFileTypes: ['image/*'],
+                customInsert(res, insertFn) {
+                    if (res.errno !== 0) {
+                        alert(res.message || '上传图片失败')
+                        return
+                    }
+                    insertFn(res.data.url, res.data.alt, res.data.href)
+                }
+            }
+        }
+    }
+
+    const editor = createEditor({
+        selector: '#editor-container',
+        html: document.querySelector('#content').value,
+        config: editorConfig,
+        mode: 'default'
+    })
+
+    const toolbarConfig = {
+        toolbarKeys: [
+            {
+                key: 'group-basic',
+                title: '基本功能',
+                menuKeys: [
+                    'bold',
+                    'italic',
+                    'underline',
+                    'through',
+                    'bulletedList',
+                    'numberedList',
+                    'insertLink'
+                ]
+            }
+        ]
+    }
+
+    const toolbar = createToolbar({
+        editor,
+        selector: '#toolbar-container',
+        config: toolbarConfig,
+        mode: 'default'
+    })
+</script>
+{% endblock %} 

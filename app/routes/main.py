@@ -318,6 +318,12 @@ def post_detail(post_id):
         if not post:
             abort(404)
             
+        # 获取作者信息
+        author = mongo.db.users.find_one({'_id': ObjectId(post['author_id'])})
+        if author:
+            post['author_avatar_url'] = author.get('avatar_url')
+            post['author_bio'] = author.get('bio')
+        
         # 处理文章内容中的图片URL
         if post.get('content'):
             content = post['content']
@@ -329,7 +335,6 @@ def post_detail(post_id):
         comments = list(mongo.db.comments.find({'post_id': ObjectId(post_id)}).sort('created_at', -1))
         
         # 获取作者信息和统计
-        author = mongo.db.users.find_one({'_id': post['author_id']})
         author_stats = {
             'posts_count': author.get('post_count', 0),
             'total_likes': author.get('total_likes', 0),
@@ -881,3 +886,28 @@ def upload_avatar():
     except Exception as e:
         current_app.logger.error(f"Error uploading avatar: {str(e)}")
         return jsonify({'success': False, 'message': '上传失败'})
+
+@bp.route('/update_bio', methods=['POST'])
+@login_required
+def update_bio():
+    try:
+        data = request.get_json()
+        bio = data.get('bio', '').strip()
+        
+        # 更新用户简介
+        mongo.db.users.update_one(
+            {'_id': ObjectId(current_user.id)},
+            {'$set': {'bio': bio}}
+        )
+        
+        return jsonify({
+            'success': True,
+            'message': '个人简介已更新'
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f"Error updating bio: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': '更新失败，请重试'
+        })

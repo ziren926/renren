@@ -85,12 +85,31 @@
         <div class="col-md-3 d-none d-md-block">
             <div class="sidebar">
                 <div class="author-info">
-                    <h5 class="author-name">关于作者</h5>
-                    <div class="author-stats">
+                    <div class="author-header">
                         <a href="{{ url_for('main.author_profile', author_id=post.author_id) }}" 
-                           class="author-profile-link">
-                            <div class="author-name-link">{{ post.author_name }}</div>
+                           class="author-avatar-link">
+                            {% if post.author_avatar_url %}
+                                <img src="{{ post.author_avatar_url }}" 
+                                     alt="{{ post.author_name }}" 
+                                     class="author-avatar">
+                            {% else %}
+                                <div class="default-avatar">
+                                    <i class="fas fa-user"></i>
+                                </div>
+                            {% endif %}
                         </a>
+                        <h5 class="author-name">
+                            <a href="{{ url_for('main.author_profile', author_id=post.author_id) }}">
+                                {{ post.author_name }}
+                            </a>
+                        </h5>
+                        {% if post.author_bio %}
+                        <div class="author-bio">
+                            {{ post.author_bio }}
+                        </div>
+                        {% endif %}
+                    </div>
+                    <div class="author-stats">
                         <div>文章数：{{ author_stats.posts_count }}</div>
                         <div>获赞：{{ author_stats.total_likes }}</div>
                         <div>加入时间：{{ author_stats.join_date.strftime('%Y-%m-%d') }}</div>
@@ -136,10 +155,10 @@ body {
 
 /* 文章标题 */
 .article-title {
-    font-size: 2.2rem;
+    font-size: 1.8rem;
     font-weight: 600;
     color: #05192D;
-    margin-bottom: 1.5rem;
+    margin-bottom: 1.2rem;
     padding-bottom: 1rem;
     border-bottom: 1px solid #E9ECEF;
 }
@@ -320,6 +339,39 @@ body {
 
 .author-profile-link:hover .author-name-link {
     color: #0052CC;
+}
+
+/* 作者头像样式 */
+.author-avatar {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    margin-bottom: 1rem;
+}
+
+.default-avatar {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    border: 2px dashed #E9ECEF;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #FFFFFF;
+    margin-bottom: 1rem;
+}
+
+.default-avatar i {
+    font-size: 1.5rem;
+    color: #6B7C93;
+}
+
+.author-bio {
+    color: #6B7C93;
+    font-size: 0.9rem;
+    line-height: 1.5;
+    margin: 1rem 0;
+    padding: 0 1rem;
 }
 </style>
 {% endblock %}

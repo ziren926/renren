@@ -213,6 +213,78 @@
         grid-template-columns: 1fr;
     }
 }
+
+/* 默认头像样式 */
+.default-avatar {
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    border: 2px dashed #E9ECEF;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #FFFFFF;
+    margin-bottom: 1.5rem;
+}
+
+.default-avatar i {
+    font-size: 2rem;
+    color: #6B7C93;
+}
+
+/* 个人简介编辑样式优化 */
+.bio-section {
+    max-width: 600px;
+    margin: 2rem auto;
+    text-align: center;
+    padding: 0 1rem;
+}
+
+.bio-content {
+    color: #37465B;
+    font-size: 1.1rem;
+    line-height: 1.6;
+    margin: 1rem 0;
+}
+
+.bio-edit {
+    margin-top: 1rem;
+}
+
+.bio-edit textarea {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid #E9ECEF;
+    border-radius: 4px;
+    margin-bottom: 1rem;
+    font-size: 1rem;
+    resize: vertical;
+    min-height: 100px;
+}
+
+.bio-edit-btn {
+    color: #0052CC;
+    cursor: pointer;
+    font-size: 0.9rem;
+    display: inline-block;
+    padding: 0.25rem 0.5rem;
+    transition: color 0.2s ease;
+}
+
+.bio-edit-btn:hover {
+    color: #0747A6;
+    text-decoration: underline;
+}
+
+.bio-edit-buttons {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: center;
+}
+
+.bio-edit-buttons button {
+    min-width: 80px;
+}
 </style>
 {% endblock %}
 
@@ -223,18 +295,28 @@
         <div class="author-header">
             {% if current_user.is_authenticated and current_user.id == author._id|string %}
             <div class="avatar-upload">
-                <img src="{{ author.avatar_url or url_for('static', filename='images/default-avatar.png') }}" 
-                     alt="{{ author.username }}" 
-                     class="author-avatar">
+                {% if author.avatar_url %}
+                    <img src="{{ author.avatar_url }}" alt="{{ author.username }}" class="author-avatar">
+                {% else %}
+                    <div class="default-avatar">
+                        <i class="fas fa-plus"></i>
+                    </div>
+                {% endif %}
                 <div class="avatar-overlay" onclick="document.getElementById('avatar-input').click()">
                     <span>更换头像</span>
                 </div>
                 <input type="file" id="avatar-input" style="display: none" accept="image/*">
             </div>
             {% else %}
-            <img src="{{ author.avatar_url or url_for('static', filename='images/default-avatar.png') }}" 
-                 alt="{{ author.username }}" 
-                 class="author-avatar">
+            <div class="avatar-upload">
+                {% if author.avatar_url %}
+                    <img src="{{ author.avatar_url }}" alt="{{ author.username }}" class="author-avatar">
+                {% else %}
+                    <div class="default-avatar">
+                        <i class="fas fa-user"></i>
+                    </div>
+                {% endif %}
+            </div>
             {% endif %}
             <h1 class="author-name">{{ author.username }}</h1>
             
@@ -256,6 +338,29 @@
             <div class="join-date">
                 加入于 {{ stats.join_date.strftime('%Y年%m月%d日') }}
             </div>
+        </div>
+
+        <!-- 添加个人简介部分 -->
+        <div class="bio-section">
+            {% if current_user.is_authenticated and current_user.id == author._id|string %}
+                <div id="bio-display" class="bio-content">
+                    {{ author.bio or '添加个人简介...' }}
+                </div>
+                <span class="bio-edit-btn" onclick="toggleBioEdit()">编辑简介</span>
+                <div id="bio-edit" class="bio-edit" style="display: none;">
+                    <textarea id="bio-textarea" rows="4">{{ author.bio or '' }}</textarea>
+                    <div class="bio-edit-buttons">
+                        <button class="btn btn-primary btn-sm" onclick="saveBio()">保存</button>
+                        <button class="btn btn-light btn-sm" onclick="toggleBioEdit()">取消</button>
+                    </div>
+                </div>
+            {% else %}
+                {% if author.bio %}
+                <div class="bio-content">
+                    {{ author.bio }}
+                </div>
+                {% endif %}
+            {% endif %}
         </div>
 
         <!-- 文章列表 -->
@@ -298,6 +403,53 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    window.toggleBioEdit = function() {
+        const displayEl = document.getElementById('bio-display');
+        const editEl = document.getElementById('bio-edit');
+        
+        if (!displayEl || !editEl) return;
+        
+        if (editEl.style.display === 'none' || !editEl.style.display) {
+            displayEl.style.display = 'none';
+            editEl.style.display = 'block';
+            document.getElementById('bio-textarea')?.focus();
+        } else {
+            displayEl.style.display = 'block';
+            editEl.style.display = 'none';
+        }
+    };
+
+    window.saveBio = function() {
+        const bioTextarea = document.getElementById('bio-textarea');
+        if (!bioTextarea) return;
+        
+        const bio = bioTextarea.value;
+        
+        fetch('{{ url_for("main.update_bio") }}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ bio: bio })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const bioDisplay = document.getElementById('bio-display');
+                if (bioDisplay) {
+                    bioDisplay.textContent = bio || '添加个人简介...';
+                    toggleBioEdit();
+                }
+            } else {
+                alert(data.message || '保存失败');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('保存失败，请重试');
+        });
+    };
+
     // 准备活动图表数据
     const postsByMonth = {{ stats.posts_by_month|tojson }};
     const labels = Object.keys(postsByMonth).sort();

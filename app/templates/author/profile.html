@@ -115,18 +115,102 @@
     padding: 2rem;
 }
 
+/* 文章卡片网格布局 */
+.posts-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem;
+    margin-top: 2rem;
+}
+
+.post-card {
+    background: #FFFFFF;
+    border: 1px solid #E9ECEF;
+    border-radius: 8px;
+    padding: 1.5rem;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.post-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.post-title {
+    font-size: 1.1rem;
+    font-weight: 500;
+    color: #05192D;
+    margin-bottom: 0.75rem;
+    text-decoration: none;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    flex-grow: 0;
+}
+
+.post-meta {
+    font-size: 0.85rem;
+    color: #6B7C93;
+    margin-bottom: 1rem;
+    flex-grow: 0;
+}
+
+.post-summary {
+    color: #37465B;
+    font-size: 0.9rem;
+    line-height: 1.6;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    flex-grow: 1;
+}
+
+/* 头像上传样式 */
+.avatar-upload {
+    position: relative;
+    display: inline-block;
+}
+
+.avatar-upload:hover .avatar-overlay {
+    opacity: 1;
+}
+
+.avatar-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.5);
+    border-radius: 50%;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+
+.avatar-overlay span {
+    color: white;
+    font-size: 0.9rem;
+}
+
 /* 响应式调整 */
+@media (max-width: 992px) {
+    .posts-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
 @media (max-width: 768px) {
-    .author-stats {
-        gap: 1.5rem;
-    }
-    
-    .stat-number {
-        font-size: 1.2rem;
-    }
-    
-    .posts-section {
-        padding: 0 1rem;
+    .posts-grid {
+        grid-template-columns: 1fr;
     }
 }
 </style>
@@ -137,9 +221,21 @@
     <div class="container">
         <!-- 作者头部信息 -->
         <div class="author-header">
+            {% if current_user.is_authenticated and current_user.id == author._id|string %}
+            <div class="avatar-upload">
+                <img src="{{ author.avatar_url or url_for('static', filename='images/default-avatar.png') }}" 
+                     alt="{{ author.username }}" 
+                     class="author-avatar">
+                <div class="avatar-overlay" onclick="document.getElementById('avatar-input').click()">
+                    <span>更换头像</span>
+                </div>
+                <input type="file" id="avatar-input" style="display: none" accept="image/*">
+            </div>
+            {% else %}
             <img src="{{ author.avatar_url or url_for('static', filename='images/default-avatar.png') }}" 
                  alt="{{ author.username }}" 
                  class="author-avatar">
+            {% endif %}
             <h1 class="author-name">{{ author.username }}</h1>
             
             <div class="author-stats">
@@ -165,23 +261,25 @@
         <!-- 文章列表 -->
         <div class="posts-section">
             <h2 class="section-title">最新文章</h2>
-            {% for post in posts %}
-            <div class="post-card">
-                <a href="{{ url_for('main.post_detail', post_id=post._id) }}" class="post-title">
-                    {{ post.title }}
-                </a>
-                <div class="post-meta">
-                    发布于 {{ post.created_at.strftime('%Y-%m-%d') }} · 
-                    {{ post.views }} 次浏览 · 
-                    {{ post.likes }} 次点赞
+            <div class="posts-grid">
+                {% for post in posts %}
+                <div class="post-card">
+                    <a href="{{ url_for('main.post_detail', post_id=post._id) }}" class="post-title">
+                        {{ post.title }}
+                    </a>
+                    <div class="post-meta">
+                        发布于 {{ post.created_at.strftime('%Y-%m-%d') }} · 
+                        {{ post.views }} 次浏览 · 
+                        {{ post.likes }} 次点赞
+                    </div>
+                    {% if post.summary %}
+                    <div class="post-summary">
+                        {{ post.summary }}
+                    </div>
+                    {% endif %}
                 </div>
-                {% if post.summary %}
-                <div class="post-summary">
-                    {{ post.summary }}
-                </div>
-                {% endif %}
+                {% endfor %}
             </div>
-            {% endfor %}
         </div>
 
         <!-- 活动图表 -->
@@ -196,6 +294,7 @@
 </div>
 
 {% block scripts %}
+{{ super() }}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
@@ -228,6 +327,34 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
         }
+    });
+});
+
+// 头像上传处理
+document.getElementById('avatar-input')?.addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    const formData = new FormData();
+    formData.append('avatar', file);
+    
+    fetch('{{ url_for("main.upload_avatar") }}', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // 更新页面上的头像
+            document.querySelector('.author-avatar').src = data.avatar_url;
+            // 可以添加成功提示
+        } else {
+            alert(data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('上传失败，请重试');
     });
 });
 </script>

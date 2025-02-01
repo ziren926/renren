@@ -742,46 +742,27 @@ def serve_file(file_id):
         if not file_id:
             return "Invalid file ID", 400
 
-        # 从 GridFS 获取文件
-        file_data = mongo.db.fs.get(ObjectId(file_id))
+        # 正确初始化 GridFS
+        fs = GridFS(mongo.db)
         
-        # 读取文件内容
-        file_content = file_data.read()
-        content_type = getattr(file_data, 'content_type', 'image/jpeg')
-        
-        # 如果是图片，处理大小
-        if content_type.startswith('image/'):
-            try:
-                # 打开图片
-                img = Image.open(io.BytesIO(file_content))
-                
-                # 计算新尺寸
-                max_size = 200
-                width, height = img.size
-                if width > max_size:
-                    # 计算缩放比例
-                    ratio = max_size / width
-                    new_size = (max_size, int(height * ratio))
-                    
-                    # 调整大小
-                    img = img.resize(new_size, Image.LANCZOS)
-                    
-                    # 保存调整后的图片
-                    output = io.BytesIO()
-                    img.save(output, format=img.format or 'JPEG', quality=85)
-                    file_content = output.getvalue()
-            
-            except Exception as e:
-                current_app.logger.error(f"Error processing image: {str(e)}")
-                # 如果处理失败，使用原始图片
-        
+        # 使用 get() 方法获取文件
+        try:
+            file_data = fs.get(ObjectId(file_id))
+        except Exception as e:
+            current_app.logger.error(f"Failed to get file {file_id}: {str(e)}")
+            return "File not found", 404
+
+        # 确保有文件名和内容类型
+        filename = file_data.filename
+        content_type = file_data.content_type or 'application/octet-stream'
+
         response = send_file(
-            io.BytesIO(file_content),
+            io.BytesIO(file_data.read()),
             mimetype=content_type,
-            download_name=getattr(file_data, 'filename', 'image.jpg'),
+            download_name=filename,
             as_attachment=False
         )
-        
+
         # 设置缓存控制
         response.headers['Cache-Control'] = 'public, max-age=31536000'
         return response
@@ -828,3 +809,75 @@ def author_profile(author_id):
     except Exception as e:
         current_app.logger.error(f"Error loading author profile: {str(e)}")
         abort(500)
+
+@bp.route('/upload_avatar', methods=['POST'])
+@login_required
+def upload_avatar():
+    try:
+        if 'avatar' not in request.files:
+            return jsonify({'success': False, 'message': '没有找到文件'})
+        
+        file = request.files['avatar']
+        if not file or not file.filename:
+            return jsonify({'success': False, 'message': '无效的文件'})
+            
+        # 检查文件类型
+        if not file.filename.lower().endswith(('.png', '.jpg', '.jpeg', '.gif')):
+            return jsonify({'success': False, 'message': '不支持的文件类型'})
+            
+        # 读取并处理图片
+        try:
+            image = Image.open(file)
+            
+            # 调整图片大小为正方形
+            size = 200
+            if image.size[0] != image.size[1]:
+                # 裁剪为正方形
+                width, height = image.size
+                new_size = min(width, height)
+                left = (width - new_size) // 2
+                top = (height - new_size) // 2
+                image = image.crop((left, top, left + new_size, top + new_size))
+            
+            # 调整大小
+            image = image.resize((size, size), Image.LANCZOS)
+            
+            # 保存处理后的图片
+            output = io.BytesIO()
+            image.save(output, format='JPEG', quality=85)
+            output.seek(0)
+            
+            # 正确初始化 GridFS
+            fs = GridFS(mongo.db)
+            
+            # 保存到GridFS
+            file_id = fs.put(
+                output,
+                filename=f'avatar_{current_user.id}.jpg',
+                content_type='image/jpeg'
+            )
+            
+            # 更新用户头像
+            mongo.db.users.update_one(
+                {'_id': ObjectId(current_user.id)},
+                {
+                    '$set': {
+                        'avatar_id': file_id,
+                        'avatar_url': url_for('main.serve_file', file_id=str(file_id), _external=True)
+                    }
+                }
+            )
+            
+            return jsonify({
+                'success': True,
+                'message': '头像上传成功',
+                'avatar_url': url_for('main.serve_file', file_id=str(file_id), _external=True)
+            })
+            
+        except Exception as e:
+            current_app.logger.error(f"Error processing avatar: {str(e)}")
+            return jsonify({'success': False, 'message': '图片处理失败'})
+            
+    except Exception as e:
+        current_app.logger.error(f"Error uploading avatar: {str(e)}")
+        return jsonify({'success': False, 'message': '上传失败'})

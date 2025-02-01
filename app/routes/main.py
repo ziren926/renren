@@ -288,67 +288,29 @@ def post_detail(post_id):
         if not post:
             abort(404)
             
-        # 添加调试日志
-        current_app.logger.info(f"Post author_id: {post.get('author_id')}, type: {type(post.get('author_id'))}")
-        if current_user.is_authenticated:
-            current_app.logger.info(f"Current user id: {current_user.id}, type: {type(current_user.id)}")
+        # 确保 author_id 是 ObjectId 类型进行查询
+        author_id = ObjectId(str(post['author_id']))
         
-        # 确保 author_id 是字符串格式
-        post['author_id'] = str(post['author_id'])
-        
-        # 添加更多调试日志
-        if current_user.is_authenticated:
-            current_app.logger.info(f"Comparison result: {current_user.id == post['author_id']}")
-            current_app.logger.info(f"After conversion - Post author_id: {post['author_id']}, Current user id: {current_user.id}")
-        
-        # 处理文章内容中的图片URL
-        if post.get('content'):
-            content = post['content']
-            content = content.replace('/file/', '/serve_file/')
-            post['content'] = content
-            
-        # 获取作者信息
-        author = mongo.db.users.find_one({'_id': ObjectId(post['author_id'])})
-        if author:
-            post['author_avatar_url'] = author.get('avatar_url')
-            post['author_bio'] = author.get('bio')
+        # 获取作者统计信息
+        author_stats = {
+            'posts_count': mongo.db.posts.count_documents({'author_id': author_id}),
+            'total_likes': sum(p.get('likes', 0) for p in mongo.db.posts.find({'author_id': author_id})),
+            'join_date': mongo.db.users.find_one({'_id': author_id})['created_at']
+        }
         
         # 获取评论
         comments = list(mongo.db.comments.find({'post_id': ObjectId(post_id)}).sort('created_at', -1))
         
-        # 获取作者信息和统计
-        author_stats = {
-            'posts_count': author.get('post_count', 0),
-            'total_likes': author.get('total_likes', 0),
-            'total_words': author.get('total_words', 0),
-            'join_date': author.get('created_at', datetime.utcnow()),
-            'last_post_at': author.get('last_post_at'),
-            'avatar_url': author.get('avatar_url', url_for('static', filename='images/default-avatar.png'))
-        }
-        
-        # 获取作者最近的帖子
-        recent_posts = list(
-            mongo.db.posts.find(
-                {'author_id': post['author_id'], '_id': {'$ne': ObjectId(post_id)}}
-            ).sort('created_at', -1).limit(5)
-        )
-        
-        # 获取相关帖子（基于标签）
-        related_posts = []
-        if 'tags' in post:
-            related_posts = list(
-                mongo.db.posts.find({
-                    '_id': {'$ne': ObjectId(post_id)},
-                    'tags': {'$in': post['tags']}
-                }).limit(3)
-            )
+        # 获取最近文章
+        recent_posts = list(mongo.db.posts.find(
+            {'author_id': author_id, '_id': {'$ne': ObjectId(post_id)}}
+        ).sort('created_at', -1).limit(5))
         
         return render_template('post/detail.html',
                              post=post,
                              comments=comments,
                              author_stats=author_stats,
-                             recent_posts=recent_posts,
-                             related_posts=related_posts)
+                             recent_posts=recent_posts)
                              
     except Exception as e:
         current_app.logger.error(f"Error loading post detail: {str(e)}")

@@ -17,7 +17,7 @@
             <div class="sidebar article-nav">
                 <div class="article-nav-title">文章脉络</div>
                 <nav id="article-nav" class="nav flex-column">
-                    <!-- 由 JavaScript 动态生成 -->
+                    <!-- 由 JavaScript 动态生成，移除任何静态内容 -->
                 </nav>
             </div>
         </div>
@@ -425,6 +425,30 @@ function deletePost(postId) {
     }
 }
 
+// 生成文章脉络
+function generateArticleNav() {
+    const content = document.querySelector('.post-content');
+    const nav = document.getElementById('article-nav');
+    if (!content || !nav) return;
+    
+    // 清空现有导航内容
+    nav.innerHTML = '';
+
+    const headings = content.querySelectorAll('h1, h2, h3, h4, h5, h6');
+    headings.forEach((heading, index) => {
+        const id = `heading-${index}`;
+        heading.id = id;
+        
+        const link = document.createElement('a');
+        link.href = `#${id}`;
+        link.className = `nav-link ${heading.tagName.toLowerCase()}`;
+        link.textContent = heading.textContent;
+        link.dataset.level = heading.tagName[1];
+        
+        nav.appendChild(link);
+    });
+}
+
 // 确保图片正确加载
 document.addEventListener('DOMContentLoaded', function() {
     const contentImages = document.querySelectorAll('.post-content img');
@@ -436,38 +460,11 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     
-    // 生成文章脉络
     generateArticleNav();
     
     // 监听滚动事件，高亮当前阅读位置
     window.addEventListener('scroll', updateActiveNavItem);
 });
-
-function generateArticleNav() {
-    const content = document.querySelector('.post-content');
-    const nav = document.getElementById('article-nav');
-    
-    // 查找所有标题元素
-    const headers = content.querySelectorAll('h1, h2, h3, h4, h5, h6');
-    
-    headers.forEach((header, index) => {
-        // 为每个标题创建一个唯一ID
-        const id = `section-${index}`;
-        header.id = id;
-        
-        // 创建导航项
-        const navItem = document.createElement('a');
-        navItem.href = `#${id}`;
-        navItem.className = `nav-link ${header.tagName.toLowerCase()}`;
-        navItem.textContent = header.textContent;
-        
-        // 根据标题级别添加缩进
-        const indent = parseInt(header.tagName.charAt(1)) - 1;
-        navItem.style.paddingLeft = `${indent * 1.0}rem`;
-        
-        nav.appendChild(navItem);
-    });
-}
 
 function updateActiveNavItem() {
     const headers = document.querySelectorAll('.post-content h1, .post-content h2, .post-content h3, .post-content h4, .post-content h5, .post-content h6');

@@ -169,51 +169,22 @@ def edit_post(post_id):
 @login_required
 def delete_post(post_id):
     try:
-        current_app.logger.info(f"Delete request received for post: {post_id}")
-        current_app.logger.info(f"Current user: {current_user.get_id()}")
-        
-        # 验证 post_id 格式
-        if not ObjectId.is_valid(post_id):
-            current_app.logger.error(f"Invalid post_id format: {post_id}")
-            return jsonify({'success': False, 'message': '无效的帖子ID'}), 400
-            
-        # 获取帖子
         post = mongo.db.posts.find_one({'_id': ObjectId(post_id)})
         if not post:
-            current_app.logger.warning(f"Post not found: {post_id}")
-            return jsonify({'success': False, 'message': '帖子不存在'}), 404
-        
-        # 验证用户权限
-        post_author_id = str(post.get('author_id'))
-        current_user_id = current_user.get_id()
-        current_app.logger.info(f"Post author ID: {post_author_id}")
-        current_app.logger.info(f"Current user ID: {current_user_id}")
-        
-        if post_author_id != current_user_id:
-            current_app.logger.warning("Permission denied - user IDs don't match")
-            return jsonify({'success': False, 'message': '没有权限删除此帖子'}), 403
-        
-        # 删除相关图片
-        if post.get('preview_image'):
-            try:
-                mongo.db.images.delete_one({'_id': ObjectId(post['preview_image'])})
-                current_app.logger.info(f"Deleted associated image: {post['preview_image']}")
-            except Exception as e:
-                current_app.logger.error(f"Error deleting image: {str(e)}")
-        
-        # 删除帖子
-        result = mongo.db.posts.delete_one({'_id': ObjectId(post_id)})
-        
-        if result.deleted_count:
-            current_app.logger.info(f"Successfully deleted post: {post_id}")
-            return jsonify({'success': True, 'message': '帖子已成功删除'})
-        else:
-            current_app.logger.error(f"Failed to delete post: {post_id}")
-            return jsonify({'success': False, 'message': '删除失败，请重试'}), 500
+            return jsonify({'success': False, 'message': '文章不存在'})
             
+        # 检查权限
+        if str(post['author_id']) != current_user.id:
+            return jsonify({'success': False, 'message': '没有权限删除此文章'})
+            
+        # 删除文章
+        mongo.db.posts.delete_one({'_id': ObjectId(post_id)})
+        
+        return jsonify({'success': True, 'message': '文章已删除'})
+        
     except Exception as e:
-        current_app.logger.error(f"Error deleting post {post_id}: {str(e)}\n{traceback.format_exc()}")
-        return jsonify({'success': False, 'message': f'删除时出现错误: {str(e)}'}), 500
+        current_app.logger.error(f"Error deleting post: {str(e)}")
+        return jsonify({'success': False, 'message': '删除失败，请重试'})
 
 def ensure_text_index():
     """确保文本索引存在"""
@@ -308,7 +279,6 @@ def allowed_file(filename):
 @bp.route('/post/<post_id>')
 def post_detail(post_id):
     try:
-        # 获取帖子信息
         post = mongo.db.posts.find_one_and_update(
             {'_id': ObjectId(post_id)},
             {'$inc': {'views': 1}},
@@ -318,18 +288,30 @@ def post_detail(post_id):
         if not post:
             abort(404)
             
+        # 添加调试日志
+        current_app.logger.info(f"Post author_id: {post.get('author_id')}, type: {type(post.get('author_id'))}")
+        if current_user.is_authenticated:
+            current_app.logger.info(f"Current user id: {current_user.id}, type: {type(current_user.id)}")
+        
+        # 确保 author_id 是字符串格式
+        post['author_id'] = str(post['author_id'])
+        
+        # 添加更多调试日志
+        if current_user.is_authenticated:
+            current_app.logger.info(f"Comparison result: {current_user.id == post['author_id']}")
+            current_app.logger.info(f"After conversion - Post author_id: {post['author_id']}, Current user id: {current_user.id}")
+        
+        # 处理文章内容中的图片URL
+        if post.get('content'):
+            content = post['content']
+            content = content.replace('/file/', '/serve_file/')
+            post['content'] = content
+            
         # 获取作者信息
         author = mongo.db.users.find_one({'_id': ObjectId(post['author_id'])})
         if author:
             post['author_avatar_url'] = author.get('avatar_url')
             post['author_bio'] = author.get('bio')
-        
-        # 处理文章内容中的图片URL
-        if post.get('content'):
-            content = post['content']
-            # 替换图片URL为正确的路由
-            content = content.replace('/file/', '/serve_file/')
-            post['content'] = content
         
         # 获取评论
         comments = list(mongo.db.comments.find({'post_id': ObjectId(post_id)}).sort('created_at', -1))

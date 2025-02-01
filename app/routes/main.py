@@ -288,14 +288,26 @@ def post_detail(post_id):
         if not post:
             abort(404)
             
-        # 确保 author_id 是 ObjectId 类型进行查询
-        author_id = ObjectId(str(post['author_id']))
+        # 确保 author_id 是字符串格式
+        post['author_id'] = str(post['author_id'])
         
+        # 获取作者信息，包括头像
+        author = mongo.db.users.find_one({'_id': ObjectId(post['author_id'])})
+        if author:
+            # 从 GridFS 获取头像 URL
+            if author.get('avatar_id'):
+                post['author_avatar_url'] = url_for('main.get_image', file_id=str(author['avatar_id']))
+            post['author_bio'] = author.get('bio')
+            
+        # 确保当前用户ID是字符串格式，方便比较
+        if current_user.is_authenticated:
+            current_user.id = str(current_user.id)
+            
         # 获取作者统计信息
         author_stats = {
-            'posts_count': mongo.db.posts.count_documents({'author_id': author_id}),
-            'total_likes': sum(p.get('likes', 0) for p in mongo.db.posts.find({'author_id': author_id})),
-            'join_date': mongo.db.users.find_one({'_id': author_id})['created_at']
+            'posts_count': mongo.db.posts.count_documents({'author_id': ObjectId(post['author_id'])}),
+            'total_likes': sum(p.get('likes', 0) for p in mongo.db.posts.find({'author_id': ObjectId(post['author_id'])}).sort('created_at', -1)),
+            'join_date': author.get('created_at')
         }
         
         # 获取评论
@@ -303,7 +315,7 @@ def post_detail(post_id):
         
         # 获取最近文章
         recent_posts = list(mongo.db.posts.find(
-            {'author_id': author_id, '_id': {'$ne': ObjectId(post_id)}}
+            {'author_id': ObjectId(post['author_id']), '_id': {'$ne': ObjectId(post_id)}}
         ).sort('created_at', -1).limit(5))
         
         return render_template('post/detail.html',
